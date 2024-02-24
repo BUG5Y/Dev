@@ -1,0 +1,26 @@
+# GoLang Team Server
+- CLI startup
+- Handle multiple operators and implants
+
+# GoLang Operator
+- CLI startup using flags for the server ip and port
+- Opens GUI
+- Login thru CLI 
+## GUI Features
+- CLI to send commands and receive output
+- Commands should include pwd, whoami, dir, cd & arbitrary cmd.exe and powershell.exe
+- Drop down menu to create implants
+
+# C++ Implant
+- Beacon with jitter
+- Select IP to beacon to from routing table
+- Retrieve commands from team server
+- Return command output to team server
+- Add jitter to packet size when beaconing
+
+
+
+
+### Feautures to implant later
+- Use donut to execute in memory
+- upload/download feature

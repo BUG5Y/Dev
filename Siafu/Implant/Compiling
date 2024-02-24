@@ -1,0 +1,7 @@
+x86_64-w64-mingw32-g++ -c /home/sev/Desktop/Siafu/Implant/implant.cpp -o /home/sev/Desktop/Siafu/Implant/Compiled/implant.o
+x86_64-w64-mingw32-g++ -c /home/sev/Desktop/Siafu/Implant/main.cpp -o /home/sev/Desktop/Siafu/Implant/Compiled/main.o
+x86_64-w64-mingw32-g++ -c /home/sev/Desktop/Siafu/Implant/results.cpp -o /home/sev/Desktop/Siafu/Implant/Compiled/results.o
+x86_64-w64-mingw32-g++ -c /home/sev/Desktop/Siafu/Implant/task.cpp -o /home/sev/Desktop/Siafu/Implant/Compiled/task.o
+
+x86_64-w64-mingw32-g++ -c file2.cpp -o file2.o
+x86_64-w64-mingw32-g++ file1.o file2.o -o myprogram.exe
