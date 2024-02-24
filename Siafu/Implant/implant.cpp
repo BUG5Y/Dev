@@ -1,5 +1,6 @@
 #include <implant.h>
 #include <xhttp.h>
+#include <xhttp.cpp>
 #include <iostream>
 
 // Use messagepack when sending data
@@ -7,7 +8,7 @@
 
 using namespace implant;
 
-int implant::beacon() {
+std::string implant::beacon() {
     std::string url = "www.example.com/index.html";
     std::string response = http_get(url);
     std::cout << response << std::endl;

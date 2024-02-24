@@ -1,3 +1,4 @@
+/*
 void Core::_generateBotId(LPWSTR buf)
 {
   WCHAR cid[40];
@@ -55,3 +56,4 @@ void Core::getCurrentBotnetName(LPWSTR name)
     Str::_CopyW(name, bs.defaultBotnet, -1);
   }
 }
+*/

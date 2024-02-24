@@ -3,7 +3,7 @@
 #include <sstream>
 #include <ws2tcpip.h>
 #include <xhttp.h>
-#include </WinSDK/um/WinSock2.h>
+#include <WinSock2.h>
 
 #pragma comment(lib, "ws2_32.lib")
 
