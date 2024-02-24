@@ -1,6 +1,5 @@
 #include <implant.h>
 #include <xhttp.h>
-#include <xhttp.cpp>
 #include <iostream>
 
 // Use messagepack when sending data
