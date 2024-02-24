@@ -9,8 +9,8 @@
 using namespace implant;
 
 std::string implant::beacon(const std::string& url) {
-    
+    std::string url = "www.example.com/index.html";
     std::string response = xhttp::http_get(url);
     std::cout << response << std::endl;
-    return 0;
+    return response;
 }
