@@ -2,14 +2,14 @@
 #include <string>
 #include <sstream>
 #include <ws2tcpip.h>
-#include <xhttp.h>
+#include "xhttp.h"
 #include <WinSock2.h>
 
 #pragma comment(lib, "ws2_32.lib")
 
-using namespace xhttp;
+namespace xhttp {
 
-bool xhttp::parse_url(const std::string& url, std::string& protocol, std::string& host, int& port, std::string& path) {
+bool parse_url(const std::string& url, std::string& protocol, std::string& host, int& port, std::string& path) {
     std::stringstream ss(url);
     std::string temp;
 
@@ -47,7 +47,7 @@ bool xhttp::parse_url(const std::string& url, std::string& protocol, std::string
     return true;
 }
 
-std::string xhttp::http_get(const std::string& url) {
+std::string http_get(const std::string& url) {
         std::string protocol, host, path;
         int port;
         if (!parse_url(url, protocol, host, port, path)) {
@@ -107,3 +107,4 @@ std::string xhttp::http_get(const std::string& url) {
     return response;
 }
 
+}

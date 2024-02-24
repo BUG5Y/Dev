@@ -4,7 +4,8 @@
 #include <string>
 
 namespace implant {
-    std::string beacon(const std::string& url);
+    extern std::string url;
+    std::string beacon();
 }
 
 #endif
