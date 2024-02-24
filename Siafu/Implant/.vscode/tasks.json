@@ -7,7 +7,7 @@
             "args": [
                 "-fdiagnostics-color=always",
                 "-g",
-                "Path-To-Implant-Folder\\*.cpp",
+                "C:\\Users\\zrbmx\\OneDrive\\Documents\\GitHub\\Dev\\Siafu\\Implant\\*.cpp",
                 "-o",
                 "${fileDirname}\\${fileBasenameNoExtension}.exe",
                 "-lstdc++",
