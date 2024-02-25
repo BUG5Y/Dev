@@ -59,5 +59,7 @@ void parseHttpResponse(const std::string& response, std::map<std::string, std::s
     if (parameters.count("hello") > 0) {
         std::cout << "Value of 'hello' parameter: " << parameters["hello"] << std::endl;
     }
+
+    // receiveCMD() 
 }
 

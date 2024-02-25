@@ -30,13 +30,6 @@ bool parse_url(const std::string& url, std::string& protocol, std::string& host,
     // Consume "//"
     getline(ss, temp, '/');
     getline(ss, temp, '/');
-    /*
-    std::cerr << temp << std::endl;
-    if (temp != "//") {
-        std::cerr << "Invalid URL format. Expected '//' after protocol." << std::endl;
-        return false;
-    }
-    */
 
     // Parse host and port
     getline(ss, host, ':');
@@ -63,7 +56,7 @@ bool parse_url(const std::string& url, std::string& protocol, std::string& host,
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 /////////                                       GET  
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-std::string http_get(const std::string& url, const std::map<std::string, std::string>& queryParameters) {
+std::string http_get(const std::string& url) { // , const std::map<std::string, std::string>& queryParameters
         std::string protocol, host, path;
         int port;
         if (!parse_url(url, protocol, host, port, path)) {
@@ -102,6 +95,10 @@ std::string http_get(const std::string& url, const std::map<std::string, std::st
             return "";
         }
 
+
+// RSA encrypt and base64 encode all data after the first ?
+// If request is to long then split into multiple requests
+/*
         std::string query;
         for (const auto& pair : queryParameters) {
             query += pair.first + "=" + pair.second + "&";
@@ -109,8 +106,8 @@ std::string http_get(const std::string& url, const std::map<std::string, std::st
         if (!query.empty()) {
             query.pop_back(); // Remove the last '&'
         }
-
-        std::string request = "GET /" + path + (query.empty() ? "" : "?" + query) + " HTTP/1.1\r\n"
+*/
+        std::string request = "GET /" + path + " HTTP/1.1\r\n" // (query.empty() ? "" : "?" + query) +
                         "Host: " + host + "\r\n"
                         "Connection: close\r\n"
                         "\r\n";
