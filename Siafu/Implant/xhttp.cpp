@@ -4,6 +4,7 @@
 #include <ws2tcpip.h>
 #include "xhttp.h"
 #include <WinSock2.h>
+#include <map>
 
 #pragma comment(lib, "ws2_32.lib")
 
@@ -13,11 +14,10 @@ bool parse_url(const std::string& url, std::string& protocol, std::string& host,
     std::stringstream ss(url);
     std::string temp;
 
-    std::cerr << "xhttp.cpp";
-    
+    std::cerr << "xhttp.cpp" << std::endl;
+
     // Parse protocol
     getline(ss, protocol, ':');
-    std::cerr << protocol << std::endl;
     if (protocol != "http") {
         std::cerr << "Invalid protocol. Only 'http' protocol is supported." << std::endl;
         return false;
@@ -40,14 +40,12 @@ bool parse_url(const std::string& url, std::string& protocol, std::string& host,
 
     // Parse host and port
     getline(ss, host, ':');
-    std::cerr << host << std::endl;
     if (host.empty()) {
         std::cerr << "Invalid URL format. Hostname is missing." << std::endl;
         return false;
     }
     std::string port_str;
     getline(ss, port_str, '/');
-    std::cerr << port_str << std::endl;
     if (port_str.empty()) {
         std::cerr << "Invalid URL format. Port number is missing." << std::endl;
         return false;
@@ -55,7 +53,6 @@ bool parse_url(const std::string& url, std::string& protocol, std::string& host,
     port = stoi(port_str);
     // Parse path
     getline(ss, path);
-    std::cerr << path << std::endl;
     if (path.empty()) {
         std::cerr << "Invalid URL format. Path is missing." << std::endl;
         return false;
@@ -63,7 +60,10 @@ bool parse_url(const std::string& url, std::string& protocol, std::string& host,
     return true;
 }
 
-std::string http_get(const std::string& url) {
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+/////////                                       GET  
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+std::string http_get(const std::string& url, const std::map<std::string, std::string>& queryParameters) {
         std::string protocol, host, path;
         int port;
         if (!parse_url(url, protocol, host, port, path)) {
@@ -102,7 +102,15 @@ std::string http_get(const std::string& url) {
             return "";
         }
 
-        std::string request = "GET /" + path + " HTTP/1.1\r\n"
+        std::string query;
+        for (const auto& pair : queryParameters) {
+            query += pair.first + "=" + pair.second + "&";
+        }
+        if (!query.empty()) {
+            query.pop_back(); // Remove the last '&'
+        }
+
+        std::string request = "GET /" + path + (query.empty() ? "" : "?" + query) + " HTTP/1.1\r\n"
                         "Host: " + host + "\r\n"
                         "Connection: close\r\n"
                         "\r\n";
@@ -132,3 +140,4 @@ std::string http_get(const std::string& url) {
 }
 
 }
+
