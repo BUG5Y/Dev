@@ -6,6 +6,7 @@
 namespace implant {
     extern std::string url;
     std::string beacon();
+    std::string initConnection();
 }
 
 #endif

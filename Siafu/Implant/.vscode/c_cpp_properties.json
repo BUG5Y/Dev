@@ -3,7 +3,8 @@
         {
             "name": "Win32",
             "includePath": [
-                "${workspaceFolder}/**"
+                "${workspaceFolder}/**",
+                "C:\\Users\\zrbmx\\vcpkg\\buildtrees\\protobuf\\src\\v3.21.12-fdb7676342.clean\\src\\**"
             ],
             "defines": [
                 "_DEBUG",

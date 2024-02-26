@@ -53,11 +53,29 @@ bool parse_url(const std::string& url, std::string& protocol, std::string& host,
     return true;
 }
 
+
+std::string buildRequest(const std::string& path, const std::string& host, const std::string& cookies) {
+   
+    std::string cookies = "ID={ xID }; cookie2=value2"; // Replace with your actual cookies
+
+    return "GET /" + path + " HTTP/1.1\r\n"
+           "Host: " + host + "\r\n"
+           "Connection: close\r\n"
+           "Cookie: " + cookies + "\r\n"
+           "\r\n";
+}
+
+
+
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 /////////                                       GET  
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Randomize the URL path based on common path
+// Randomize the parameter names
+// Use cookies to send the content
+
 std::string http_get(const std::string& url) { // , const std::map<std::string, std::string>& queryParameters
-        std::string protocol, host, path;
+        std::string protocol, host, path, cookies;
         int port;
         if (!parse_url(url, protocol, host, port, path)) {
             return "";
@@ -95,22 +113,7 @@ std::string http_get(const std::string& url) { // , const std::map<std::string, 
             return "";
         }
 
-
-// RSA encrypt and base64 encode all data after the first ?
-// If request is to long then split into multiple requests
-/*
-        std::string query;
-        for (const auto& pair : queryParameters) {
-            query += pair.first + "=" + pair.second + "&";
-        }
-        if (!query.empty()) {
-            query.pop_back(); // Remove the last '&'
-        }
-*/
-        std::string request = "GET /" + path + " HTTP/1.1\r\n" // (query.empty() ? "" : "?" + query) +
-                        "Host: " + host + "\r\n"
-                        "Connection: close\r\n"
-                        "\r\n";
+        std::string request = buildRequest(path, host, cookies);
 
         if (send(ConnectSocket, request.c_str(), request.length(), 0) == SOCKET_ERROR) {
             std::cerr << "Error sending request: " << WSAGetLastError() << std::endl;

