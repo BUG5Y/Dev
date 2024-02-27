@@ -60,7 +60,7 @@ bool parse_url(const std::string& url, std::string& protocol, std::string& host,
 
 std::string createCookiesString(const std::string& xID) {
     // Define the cookies string with dynamic ID
-    std::string cookies = "ID=" + xID + "; cookie2=value2";
+    std::string cookies = "ID=value1 + ; cookie2=value2";
 
     return cookies;
 }
