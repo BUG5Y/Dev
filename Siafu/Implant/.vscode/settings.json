@@ -65,6 +65,10 @@
         "stop_token": "cpp",
         "thread": "cpp",
         "variant": "cpp",
-        "cinttypes": "cpp"
+        "cinttypes": "cpp",
+        "*.inc": "cpp",
+        "condition_variable": "cpp",
+        "mutex": "cpp",
+        "future": "cpp"
     }
 }

