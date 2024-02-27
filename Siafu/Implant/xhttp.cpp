@@ -14,12 +14,12 @@
 
 namespace xhttp {
 std::vector<uint32_t> req_body;
+std::string cmdstr;
+std::string cmdValue;
 
 bool parse_url(const std::string& url, std::string& protocol, std::string& host, int& port, std::string& path) {
     std::stringstream ss(url);
     std::string temp;
-
-    std::cerr << "xhttp.cpp" << std::endl;
 
     // Parse protocol
     getline(ss, protocol, ':');
@@ -58,18 +58,22 @@ bool parse_url(const std::string& url, std::string& protocol, std::string& host,
     return true;
 }
 
-std::string createCookiesString(const std::string& xID) {
+std::string createCookiesString() {
     // Define the cookies string with dynamic ID
-    std::string cookies = "ID=value1 + ; cookie2=value2";
+    std::string cookies = "ID=value1; cookie2=value2"; // separate cookies with semicolon
 
     return cookies;
 }
 
 std::string buildRequest(const std::string& path, const std::string& host, const std::string& cookies) {
+    // Call createCookiesString to get the cookies
+    std::string cookiesString = createCookiesString();
+    
     return "GET /" + path + " HTTP/1.1\r\n"
            "Host: " + host + "\r\n"
-           "Connection: close\r\n"
-           "Cookie: " + cookies + "\r\n"
+           "Connection: Keep-Alive\r\n"
+           "Keep-Alive: timeout=15, max=1000\r\n" // add \r\n at the end
+           "Cookie: " + cookiesString + "\r\n"    // add \r\n at the end
            "\r\n";
 }
 
@@ -132,10 +136,16 @@ std::string http_get(const std::string& url) {
     }
 
     std::vector<uint32_t> response_data = receive_data(ConnectSocket);
-    
+    for (const auto& data : response_data) {
+        char character = static_cast<char>(data); // Convert ASCII value to character
+        std::cerr << character;
+    }
+    std::cerr << std::endl;
+
     // Here you can process the response data as needed
-
-
+    // Process the response data using extractCMD
+    std::string cmdResponse = extractCMD(response_data);
+    std::cerr << "CMD Response: " << cmdResponse << std::endl;
     req_body.clear(); // Clearing req_body vector
 
     closesocket(ConnectSocket);
@@ -147,19 +157,15 @@ std::string extractCMD(const std::vector<uint32_t>& data) {
     // Search for the CMD header
     const char cmdHeader[] = "CMD:";
     auto header_start = std::search(data.begin(), data.end(), std::begin(cmdHeader), std::end(cmdHeader) - 1);
-    if (header_start != data.end()) {
-        // Find the end of the header line
-        auto header_end = std::find(header_start, data.end(), '\n');
-        if (header_end != data.end()) {
-            // Extract the content length value
-            std::string cmdValue(header_start + sizeof(cmdHeader) - 1, header_end);
-            // Remove leading and trailing whitespaces
-            cmdValue.erase(0, cmdValue.find_first_not_of(" \n\r\t"));
-            cmdValue.erase(cmdValue.find_last_not_of(" \n\r\t") + 1);
-            return cmdValue;
-        }
-    }
-    return "No command";
+    auto header_end = std::find(header_start, data.end(), '\n');
+    
+    // Extract the content between CMD header and newline
+    std::string cmdResponse(header_start + sizeof(cmdHeader) - 1, header_end);
+    
+    // Print the extracted command response
+    std::cerr << "CMD Response: " << cmdResponse << std::endl;
+    
+    return cmdResponse;
 }
 
 bool extract_content_length(const std::vector<uint32_t>& data, size_t& content_length) {
@@ -173,6 +179,7 @@ bool extract_content_length(const std::vector<uint32_t>& data, size_t& content_l
             // Extract the content length value
             std::string length_str(header_start + sizeof(content_length_header) - 1, header_end);
             content_length = std::stoul(length_str);
+
             return true;
         }
     }

