@@ -14,7 +14,8 @@ namespace xhttp {
     extern SOCKET ConnectSocket;
     extern std::string cmdstr;
     extern std::string cmdValue;
-
+    extern std::string cmd;
+    
     std::string http_get(const std::string& url);
     std::vector<char> receive_data(SOCKET ConnectSocket);
     SOCKET create_socket(const std::string& host, int port);

