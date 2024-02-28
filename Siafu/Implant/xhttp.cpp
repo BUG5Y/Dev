@@ -135,7 +135,7 @@ std::string http_get(const std::string& url) {
         return "";
     }
 
-    std::vector<uint32_t> response_data = receive_data(ConnectSocket);
+    std::vector<char> response_data = receive_data(ConnectSocket);
     for (const auto& data : response_data) {
         char character = static_cast<char>(data); // Convert ASCII value to character
         std::cerr << character;
@@ -145,7 +145,6 @@ std::string http_get(const std::string& url) {
     // Here you can process the response data as needed
     // Process the response data using extractCMD
     std::string cmdResponse = extractCMD(response_data);
-    std::cerr << "CMD Response: " << cmdResponse << std::endl;
     req_body.clear(); // Clearing req_body vector
 
     closesocket(ConnectSocket);
@@ -153,7 +152,7 @@ std::string http_get(const std::string& url) {
     return ""; // Placeholder for response handling
 }
 
-std::string extractCMD(const std::vector<uint32_t>& data) {
+std::string extractCMD(const std::vector<char>& data) {
     // Search for the CMD header
     const char cmdHeader[] = "CMD:";
     auto header_start = std::search(data.begin(), data.end(), std::begin(cmdHeader), std::end(cmdHeader) - 1);
@@ -162,60 +161,72 @@ std::string extractCMD(const std::vector<uint32_t>& data) {
     // Extract the content between CMD header and newline
     std::string cmdResponse(header_start + sizeof(cmdHeader) - 1, header_end);
     
-    // Print the extracted command response
-    std::cerr << "CMD Response: " << cmdResponse << std::endl;
-    
     return cmdResponse;
 }
 
-bool extract_content_length(const std::vector<uint32_t>& data, size_t& content_length) {
+bool extract_content_length(const std::vector<char>& data, size_t& content_length) {
     // Search for the Content-Length header
-    const char content_length_header[] = "Content-Length:";
-    auto header_start = std::search(data.begin(), data.end(), std::begin(content_length_header), std::end(content_length_header) - 1);
+    const std::string content_length_header = "Content-Length:";
+    auto header_start = std::search(data.begin(), data.end(), content_length_header.begin(), content_length_header.end());
     if (header_start != data.end()) {
         // Find the end of the header line
         auto header_end = std::find(header_start, data.end(), '\n');
         if (header_end != data.end()) {
             // Extract the content length value
-            std::string length_str(header_start + sizeof(content_length_header) - 1, header_end);
+            std::string length_str(header_start + content_length_header.size(), header_end);
             content_length = std::stoul(length_str);
-
             return true;
         }
     }
     return false;
 }
 
-std::vector<uint32_t> receive_data(SOCKET ConnectSocket) {
-
+std::vector<char> receive_data(SOCKET ConnectSocket) {
     constexpr size_t BUFFER_SIZE = 1024;
-    char buffer[BUFFER_SIZE];
-    size_t read = 0;
+    std::vector<char> buffer;
+    int totalBytesReceived = 0;
+    int bytesReceived;
 
     size_t content_length = 0;
     bool found_content_length = false;
 
-    while (true) {
-        read = recv(ConnectSocket, buffer, BUFFER_SIZE, 0);
-        if (read <= 0) {
-            // Either an error occurred or the connection was closed
-            break;
-        }
-        // Append received data to req_body
-        req_body.insert(req_body.end(), buffer, buffer + read);
+    do {
+        char chunkBuffer[BUFFER_SIZE];
+        bytesReceived = recv(ConnectSocket, chunkBuffer, BUFFER_SIZE, 0);
+        if (bytesReceived > 0) {
+            buffer.insert(buffer.end(), chunkBuffer, chunkBuffer + bytesReceived);
+            totalBytesReceived += bytesReceived;
 
-        // Check if we have found the Content-Length header
-        if (!found_content_length) {
-            found_content_length = extract_content_length(req_body, content_length);
-        }
+            // Check if we have found the Content-Length header
+            if (!found_content_length) {
+                // Convert buffer to string to search for Content-Length
+                std::string str(buffer.begin(), buffer.end());
+                found_content_length = extract_content_length(buffer, content_length);
+            }
 
-        // Check if we have received the entire body
-        if (found_content_length && req_body.size() >= content_length) {
+            // Check if we have received the entire body
+            if (found_content_length && totalBytesReceived >= content_length) {
+                break;
+            }
+        } else if (bytesReceived == 0) {
+            // Connection closed by the server
             break;
+        } else {
+            std::cerr << "recv failed\n";
+            closesocket(ConnectSocket);
+            WSACleanup();
+            // Return an empty vector indicating failure
+            return std::vector<char>();
         }
+    } while (bytesReceived == BUFFER_SIZE);
+
+    std::cout << "Received " << totalBytesReceived << " bytes: ";
+    for (char c : buffer) {
+        std::cout << c;
     }
+    std::cout << std::endl;
 
-    return req_body;
+    return buffer;
 }
 
 }
