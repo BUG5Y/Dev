@@ -231,7 +231,7 @@ std::vector<char> receive_data(SOCKET ConnectSocket) {
     std::string cmd = extractCMD(buffer);
 
     if (!cmd.empty()) {
-        command::parseCmd(cmdString);
+        command::parseCmd(cmdString, command::hStdInWr);
     } else {
         std::cerr << "Received empty command" << std::endl;
     }
