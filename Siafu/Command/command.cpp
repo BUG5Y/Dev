@@ -1,14 +1,8 @@
 #include <windows.h>
 #include <stdio.h>
-#include <tchar.h>
+#include <algorithm>
 #include <string>
-#include <vector>
-#include <cstdio>
-#include <cstdlib>
-#include <cstring>
-#include <unistd.h>
 
-HANDLE hPipe;
 HANDLE hReadPipe, hWritePipe;
 SECURITY_ATTRIBUTES saAttr;
 PROCESS_INFORMATION piProcInfo;
@@ -16,19 +10,26 @@ STARTUPINFO siStartInfo;
 DWORD dwRead, dwWritten;
 char buffer[1024];
 BOOL bSuccess;
+bool openProc = false;
 
-void handleProc() {
-
-    // Create a pipe for the child process's STDOUT
-    if (!CreatePipe(&hReadPipe, &hWritePipe, &saAttr, 0)) {
-        printf("CreatePipe failed.\n");
+void handleProc(HANDLE hReadPipe, HANDLE hWritePipe) {
+    // Check if the pipe handles are valid
+    if (hReadPipe == NULL || hWritePipe == NULL) {
+        printf("Invalid pipe handles.\n");
         return;
     }
-
-        // Keep the process open indefinitely
-    while (true) {
+    
+    // Read from the pipe
+    char buffer[1024]; // Increased buffer size
+    DWORD dwRead, dwWritten;
+    BOOL bSuccess;
+    bool bProcessEnded = false;
+    std::string output = "";
+    
+    // Keep the process open indefinitely
+    while (openProc) {
         // Write to the child process's standard input
-        const char* message = "echo ABC123";
+        const char* message = "echo ABC123\n"; // Include newline character
         bSuccess = WriteFile(hWritePipe, message, strlen(message), &dwWritten, NULL);
         if (!bSuccess) {
             printf("WriteFile to pipe failed.\n");
@@ -38,46 +39,43 @@ void handleProc() {
         // Sleep for some time before sending the next message
         Sleep(1000); // Sleep for 1 second
 
-        // Read from the pipe
-        bSuccess = ReadFile(hReadPipe, buffer, sizeof(buffer), &dwRead, NULL);
-        if (!bSuccess || dwRead == 0) {
-            printf("ReadFile from pipe failed.\n");
-            return;
+        // Check if the child process has ended
+        bProcessEnded = WaitForSingleObject(piProcInfo.hProcess, 50) == WAIT_OBJECT_0;
+
+        // Read from the pipe until there's no more data available
+        while (true) {
+            bSuccess = ReadFile(hReadPipe, buffer, sizeof(buffer), &dwRead, NULL);
+            if (!bSuccess || dwRead == 0) break;
+            output.append(buffer, dwRead);
         }
 
-        printf("Received from child process: %s\n", buffer);
 
+        // If the process has ended, break out of the loop
+        if (bProcessEnded)
+            break;
     }
-
-    // Close handles
-    CloseHandle(hReadPipe);
-    CloseHandle(piProcInfo.hProcess);
-    CloseHandle(piProcInfo.hThread);
-
 }
 
-void createProc()
-{
+void createProc() {
     HANDLE hMutex;
-    // create mutex with a name so multiple instances can detect it
+    // Create mutex with a name so multiple instances can detect it
     hMutex = CreateMutexA(NULL, FALSE, "ProcMutex");
 
+    if (hMutex == NULL) {
+        printf("Mutex creation failed.\n");
+        return;
+    }
+
     if (GetLastError() == ERROR_ALREADY_EXISTS) {
-        // if this process created the mutex, exit the application
-        if (hMutex && GetLastError() == ERROR_ALREADY_EXISTS) {
         printf("BeaconMutex already exists, beacon already running\n");
         CloseHandle(hMutex);
         return;
-        }
     }
 
     HANDLE hReadPipe, hWritePipe;
     SECURITY_ATTRIBUTES saAttr;
     PROCESS_INFORMATION piProcInfo;
     STARTUPINFOA siStartInfo;
-    DWORD dwRead, dwWritten;
-    char buffer[100];
-    BOOL bSuccess;
 
     // Set the bInheritHandle flag so pipe handles are inherited
     saAttr.nLength = sizeof(SECURITY_ATTRIBUTES);
@@ -87,6 +85,7 @@ void createProc()
     // Create a pipe for the child process's STDOUT
     if (!CreatePipe(&hReadPipe, &hWritePipe, &saAttr, 0)) {
         printf("CreatePipe failed.\n");
+        CloseHandle(hMutex);
         return;
     }
 
@@ -96,60 +95,40 @@ void createProc()
     // Ensure the write handle to the pipe for STDIN is not inherited
     SetHandleInformation(hWritePipe, HANDLE_FLAG_INHERIT, 0);
 
-    // Set up members of the PROCESS_INFORMATION structure
-    ZeroMemory(&piProcInfo, sizeof(PROCESS_INFORMATION));
-
     // Set up members of the STARTUPINFO structure
     ZeroMemory(&siStartInfo, sizeof(STARTUPINFO));
     siStartInfo.cb = sizeof(STARTUPINFO);
-    siStartInfo.hStdOutput = hWritePipe; // Redirect child process's standard output to the write end of the pipe
-    siStartInfo.hStdInput = hReadPipe; // Pass the read end of the pipe as the child process's standard input
-    
+    siStartInfo.hStdOutput = hReadPipe; // Redirect child process's standard output to the write end of the pipe
+    siStartInfo.hStdInput = hWritePipe; // Pass the read end of the pipe as the child process's standard input
     siStartInfo.dwFlags |= STARTF_USESTDHANDLES;
 
- 
     // Start the child process. 
-    if( !CreateProcessA( "C:\\Windows\\System32\\cmd.exe",   // No module name (use command line)
-        NULL,           // Command line
-        NULL,           // Process handle not inheritable
-        NULL,           // Thread handle not inheritable
-        FALSE,          // Set handle inheritance to FALSE
-        0,              // No creation flags
-        NULL,           // Use parent's environment block
-        NULL,           // Use parent's starting directory 
-        &siStartInfo,            // Pointer to STARTUPINFO structure
-        &piProcInfo )           // Pointer to PROCESS_INFORMATION structure
-    ) 
-    {
-        printf( "CreateProcess failed (%d).\n", GetLastError() );
+    if (!CreateProcessA("C:\\Windows\\System32\\cmd.exe", NULL, NULL, NULL, TRUE, 0, NULL, NULL, &siStartInfo, &piProcInfo)) {
+        printf("CreateProcess failed (%d).\n", GetLastError());
+        CloseHandle(hReadPipe);
+        CloseHandle(hWritePipe);
+        CloseHandle(hMutex);
         return;
     }
+    openProc = TRUE;
 
-    DWORD TID = piProcInfo.dwThreadId;
-    DWORD PID = piProcInfo.dwProcessId;
-    HANDLE hThread = piProcInfo.hThread;
-    HANDLE hProcess = piProcInfo.hProcess;
+    // Close process handles not needed in the parent process
+    CloseHandle(piProcInfo.hThread);
+    CloseHandle(piProcInfo.hProcess);
 
-    printf("(+) process started! pid: %ld\n", PID);
-    printf("\t(+) pid: %ld, handle: 0x%x\n", PID, hProcess);
-    printf("\t(+) tid: %ld, handle: 0x%x\n\r", TID, hThread);
+    printf("(+) process started! pid: %ld\n", piProcInfo.dwProcessId);
+    printf("\t(+) pid: %ld, handle: 0x%x\n", piProcInfo.dwProcessId, hReadPipe);
+    printf("\t(+) tid: %ld, handle: 0x%x\n\r", piProcInfo.dwThreadId, hWritePipe);
 
-    handleProc();
+    handleProc(hReadPipe, hWritePipe);
 
-    // Close process and thread handles. 
-    CloseHandle( piProcInfo.hProcess );
-    CloseHandle( piProcInfo.hThread );
+    // Close pipe handles
+    CloseHandle(hReadPipe);
+    CloseHandle(hWritePipe);
 
-    // cleanup
-    if (hMutex)
-        CloseHandle(hMutex);
-    return;
-
+    // Cleanup
+    CloseHandle(hMutex);
 }
-
-
-
-
 
 int main(){
   
@@ -165,3 +144,4 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 */
+
