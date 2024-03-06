@@ -13,10 +13,9 @@ namespace xhttp {
     extern std::vector<uint32_t> req_body;
     extern SOCKET ConnectSocket;
     extern std::string cmdstr;
-    extern std::string cmdValue;
     extern std::string cmd;
     extern std::string cmdString;
-    extern std::string cmdResponse;
+    extern std::string cmdValue;
     
     std::string http_get(const std::string& url);
     std::vector<char> receive_data(SOCKET ConnectSocket);

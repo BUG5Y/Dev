@@ -6,6 +6,17 @@ const std::string current_dir = "."; // Initialize current_dir with a valid dire
 std::string out_put; // Initialize out_put with an empty string
 DWORD time_out = 5000; // Initialize time_out with a timeout value in milliseconds
 
+PAYLOAD_COMMAND m_PayloadCommands[] = {
+
+    { "shell", execute_cmd },
+//    { "flist", CommandFileList },
+//    { "fget", CommandFileGet },
+//    { "fput", CommandFilePut },
+    { NULL, NULL }
+
+};
+
+
 bool execute_cmd(const std::string& current_dir, std::string& out_put, DWORD time_out) //const std::string& cmd_line, 
 {
 	const std::string cmd_line = "echo ABC123";
