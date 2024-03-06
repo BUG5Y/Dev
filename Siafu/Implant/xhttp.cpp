@@ -87,6 +87,7 @@ std::string buildRequest(const std::string& path, const std::string& host, const
         std::string queryParams = "cmdValue=" + cmdGroup + "&cmdString=" + cmdString + "&cmdResponse=" + cmdResponse;
 
         std::cout << "Params: " << queryParams << std::endl;
+
         return "GET /" + path + "?" + queryParams + " HTTP/1.1\r\n"
                "Host: " + host + "\r\n"
                "Connection: Keep-Alive\r\n"
@@ -96,6 +97,7 @@ std::string buildRequest(const std::string& path, const std::string& host, const
         
     } else {
         // Queue is empty, return request without command information
+        std::cout << "Empty queue" << std::endl;
         std::string cookiesString = createCookiesString(); // Assuming this function is defined
         return "GET /" + path + "?" + " HTTP/1.1\r\n"
                "Host: " + host + "\r\n"
@@ -188,10 +190,9 @@ std::string extractCMD(const std::vector<char>& data) {
     auto argstart = std::search(data.begin(), data.end(), std::begin(cmda), std::end(cmda) - 1);
     auto argend = std::find(argstart, data.end(), '\n');
     
-    cmdValue.assign(header_start + sizeof(cmdHeader) - 1, header_end);
+    cmdGroup.assign(header_start + sizeof(cmdHeader) - 1, header_end);
     cmdString.assign(argstart + sizeof(cmda) - 1, argend);
-
-
+    
     return cmdValue;
 }
 
