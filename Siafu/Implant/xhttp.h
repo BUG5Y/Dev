@@ -5,6 +5,7 @@
 #include <vector>
 #include <cstdint>
 #include <Winsock2.h>
+#include <map>
 
 namespace xhttp {
     extern std::string host;
@@ -14,13 +15,27 @@ namespace xhttp {
     extern SOCKET ConnectSocket;
     extern std::string cmdstr;
     extern std::string cmd;
-    extern std::string cmdString;
-    extern std::string cmdValue;
-    
+    extern int key;
+    extern std::string cmdResponse;
+
     std::string http_get(const std::string& url);
     std::vector<char> receive_data(SOCKET ConnectSocket);
     SOCKET create_socket(const std::string& host, int port);
     std::string extractCMD(const std::vector<char>& data);
+
+    struct Command {
+    std::string cmdGroup;
+    std::string cmdString;
+    std::string cmdResponse;
+    };
+
+    typedef std::map<int, Command> CommandQueue;
+
+void addToQueue(CommandQueue& queue, int key, const std::string& cmdValue, const std::string& cmdString, const std::string& cmdResponse);
+void removeFromQueue(CommandQueue& queue, int key);
+// Define a type alias for the map that will store the queue
+  // You can use unordered_map if order doesn't matter
+
 }
 
 #endif
