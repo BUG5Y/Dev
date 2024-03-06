@@ -225,8 +225,8 @@ std::vector<char> receive_data(SOCKET ConnectSocket) {
 
 //    std::cerr << "CMD: " << cmdValue << std::endl; 
 //    std::cerr << "CMD String: " << cmdString << std::endl; 
-
-    if (cmdString != "aaa") {
+    std::cout << cmdString << std::endl;
+    if (!cmdString.empty()) {
         wincmd::execute_cmd(cmdString, wincmd::current_dir, wincmd::out_put, wincmd::time_out); //  
     } else {
         std::cerr << "Received empty command" << std::endl;

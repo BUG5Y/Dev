@@ -41,7 +41,7 @@ bool execute_cmd(std::string& cmdString, std::string& current_dir, std::string& 
 	HANDLE write_hd = NULL;
 	BOOL ret = CreatePipe(&read_hd, &write_hd, &sa, 64 * 0x1000);
 	out_put.clear();
-	
+
 	if (!ret) {
 		return false;
 	}
@@ -100,7 +100,7 @@ bool execute_cmd(std::string& cmdString, std::string& current_dir, std::string& 
 	CloseHandle(read_hd);
 	delete[] buffer;
 
-	cmdString = "aaa"; // Can't uninitialize so write a default value
+	cmdString.clear();
 	return result;
 }
 
