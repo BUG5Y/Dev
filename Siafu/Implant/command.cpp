@@ -44,7 +44,7 @@ bool execute_cmd(xhttp::CommandQueue& queue, std::string& current_dir, DWORD tim
         return false;
     }
 
-    while (!queue.empty()) {
+    if (!queue.empty()) {
         // Get an iterator to the first element
         auto it = queue.begin();
         // Access the command info
@@ -54,7 +54,7 @@ bool execute_cmd(xhttp::CommandQueue& queue, std::string& current_dir, DWORD tim
         std::string cmdString = cmdqueue.cmdString;
         std::string cmdResponse = cmdqueue.cmdResponse;
 
-        cmdResponse.clear();
+		cmdResponse.clear();
 
         STARTUPINFOA si = { 0 };
         PROCESS_INFORMATION pi = { 0 };
@@ -63,7 +63,6 @@ bool execute_cmd(xhttp::CommandQueue& queue, std::string& current_dir, DWORD tim
         si.dwFlags = STARTF_USESHOWWINDOW | STARTF_USESTDHANDLES;
         si.wShowWindow = SW_HIDE;
         si.hStdOutput = write_hd;
-        std::cout << "cmdString: " << cmdString << std::endl;
         std::string cmd = "cmd.exe /c " + cmdString;
         ret = CreateProcessA(NULL, (LPSTR)cmd.c_str(), NULL, NULL, TRUE, 0, NULL, current_dir.c_str(), &si, &pi);
         CloseHandle(write_hd);
@@ -116,11 +115,13 @@ bool execute_cmd(xhttp::CommandQueue& queue, std::string& current_dir, DWORD tim
 		std::cout << "CMD Group: " << cmdGroup << std::endl;
 		std::cout << "CMD String: " << cmdString << std::endl;
 		std::cout << "Output: " << cmdResponse << std::endl;
+		cmdGroup.clear();
+		cmdString.clear();
+		std::cout << "After clearing CMD Group: " << cmdGroup << std::endl;
+		std::cout << "After clearing CMD String: " << cmdString << std::endl;
         CloseHandle(read_hd);
         delete[] buffer;
     }
-
-    // Clear cmdString after processing all commands in the queue
     current_dir.clear();
     return true;
 }

