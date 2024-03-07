@@ -19,6 +19,8 @@ std::string cmdstr;
 std::string cmdString;
 std::string cmdGroup;
 std::string cmdValue;
+std::string queryParams;
+std::string encodedParams;
 CommandQueue queue;
 int key;
 std::string cmdResponse;
@@ -295,6 +297,9 @@ std::vector<char> receive_data(SOCKET ConnectSocket) {
         std::cerr << "Received empty command" << std::endl;
     }
     cmdString.clear();
+    queryParams.clear();
+    encodedParams.clear();
+
     return buffer;
 }
 
