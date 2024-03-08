@@ -117,8 +117,6 @@ bool execute_cmd(xhttp::CommandQueue& queue, std::string& current_dir, DWORD tim
 		std::cout << "Output: " << cmdResponse << std::endl;
 		cmdGroup.clear();
 		cmdString.clear();
-		std::cout << "After clearing CMD Group: " << cmdGroup << std::endl;
-		std::cout << "After clearing CMD String: " << cmdString << std::endl;
         CloseHandle(read_hd);
         delete[] buffer;
     }

