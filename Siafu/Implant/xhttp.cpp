@@ -88,8 +88,6 @@ std::string buildRequest(const std::string& path, const std::string& host, const
         std::string cookiesString = createCookiesString(); // Assuming this function is defined
         std::string queryParams = "cmdValue=" + cmdGroup + "&cmdString=" + cmdString + "&cmdResponse=" + cmdResponse;
         std::string encodedParams = base64_encode(queryParams);
-        
-        std::cout << "Params: " << encodedParams << std::endl;
 
         removeFromQueue(queue, it->first); // Passing the key to removeFromQueue
     

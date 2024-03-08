@@ -8,6 +8,7 @@ import (
     "net/url"
     "os"
     "strings"
+	"encoding/json"
 )
 
 const (
@@ -37,8 +38,6 @@ func main() {
         cmdGroup := parts[0]
         cmdString := strings.Join(parts[1:], " ")
 
-		fmt.Println("cmdGroup: ", cmdGroup)
-		fmt.Println("cmdString: ", cmdString)
         // Send the command to the server
         err = sendCommand(cmdGroup, cmdString)
         if err != nil {
@@ -74,17 +73,32 @@ func sendCommand(cmdGroup, cmdString string) error {
     if err != nil {
         return err
     }
-    defer resp.Body.Close()
+    
 
-    // Check response status
+    // Check the response status code
     if resp.StatusCode != http.StatusOK {
         return fmt.Errorf("unexpected status code: %d", resp.StatusCode)
     }
 
-    fmt.Println("Command sent successfully.")
-	
-	// Wait for reply
+    // Read and parse the response JSON
+    var response struct {
+        CmdGroup   string `json:"cmdGroup"`
+        CmdString  string `json:"cmdString"`
+        CmdResponse string `json:"cmdResponse"`
+    }
 
+    err = json.NewDecoder(resp.Body).Decode(&response)
+    if err != nil {
+        return err
+    }
+
+    // Replace for readability
+    response.CmdResponse = strings.Replace(response.CmdResponse, "\\n", "\n", -1)
+    response.CmdResponse = strings.Replace(response.CmdResponse, "\\r", "\r", -1)
+
+    fmt.Println("CmdResponse:", response.CmdResponse)
+
+	defer resp.Body.Close()
 	
 
     return nil

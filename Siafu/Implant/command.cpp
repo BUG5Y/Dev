@@ -108,13 +108,8 @@ bool execute_cmd(xhttp::CommandQueue& queue, std::string& current_dir, DWORD tim
             }
         }
 
-        std::cout << "Dir: " << current_dir << std::endl;
-        
 		// Update CommandInfo structure with cmdResponse
         cmdqueue.cmdResponse = cmdResponse;
-		std::cout << "CMD Group: " << cmdGroup << std::endl;
-		std::cout << "CMD String: " << cmdString << std::endl;
-		std::cout << "Output: " << cmdResponse << std::endl;
 		cmdGroup.clear();
 		cmdString.clear();
         CloseHandle(read_hd);

