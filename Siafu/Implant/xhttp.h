@@ -26,11 +26,12 @@ namespace xhttp {
     std::string extractCMD(const std::vector<char>& data);
     std::string base64_encode(const std::string &in);
     
-    struct Command {
-    std::string cmdGroup;
-    std::string cmdString;
-    std::string cmdResponse;
-    };
+struct Command {
+    std::string Group;
+    std::string String;
+    std::string Response;
+
+};
 
     typedef std::map<int, Command> CommandQueue;
 

@@ -3,12 +3,10 @@
         {
             "name": "Win32",
             "includePath": [
-<<<<<<< HEAD
-                "${workspaceFolder}/**"
-=======
                 "${workspaceFolder}/**",
-                ""
->>>>>>> 815a42cba35b65df1a0247b2d30760ddd38a657e
+                "${workspaceFolder}/json/include/nlohmann**",
+                "${workspaceFolder}/json/include/**"
+
             ],
             "defines": [
                 "_DEBUG",

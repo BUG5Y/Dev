@@ -10,6 +10,9 @@
 #include <stdint.h>
 #include <algorithm>
 #include "command.h"
+#include <vector>
+#include "C:\msys64\ucrt64\include\zlib\zlib.h"
+#include <nlohmann\json.hpp>
 
 #pragma comment(lib, "ws2_32.lib")
 
@@ -24,6 +27,32 @@ std::string encodedParams;
 CommandQueue queue;
 int key;
 std::string cmdResponse;
+
+struct Command {
+    std::string Group;
+    std::string String;
+    std::string Response;
+};
+
+// Function to serialize a Command object
+std::vector<uint8_t> serializeCommand(const Command& acmd) {
+    // Pack the Command object into a std::vector<uint8_t>
+    using namespace msgpack_lite;
+    std::vector<uint8_t> sbuf;
+    Packer packer(sbuf, acmd);
+
+    return sbuf;
+}
+// Function to deserialize a Command object
+Command deserializeCommand(const std::vector<uint8_t>& packedData) {
+    // Create a msgpack::object_handle to hold the deserialized data
+    using namespace msgpack_lite;
+    Unpacker unpacker(std::cin);
+    msgpack_lite::object_handle oh = unpacker(packedData.data(), packedData.size());
+
+    // Convert the msgpack::object to a Command object
+    return oh.get().as<Command>();
+}
 
 bool parse_url(const std::string& url, std::string& protocol, std::string& host, int& port, std::string& path) {
     std::stringstream ss(url);
@@ -81,12 +110,30 @@ std::string buildRequest(const std::string& path, const std::string& host, const
        
         auto& cmdqueue = it->second;
         
-        std::string cmdGroup = cmdqueue.cmdGroup;
-        std::string cmdString = cmdqueue.cmdString;
-        std::string cmdResponse = cmdqueue.cmdResponse;
+        std::string cmdGroup = cmdqueue.Group;
+        std::string cmdString = cmdqueue.String;
+        std::string cmdResponse = cmdqueue.Response;
 
-        std::string cookiesString = createCookiesString(); // Assuming this function is defined
-        std::string queryParams = "cmdValue=" + cmdGroup + "&cmdString=" + cmdString + "&cmdResponse=" + cmdResponse;
+///
+        // Create an instance of your structure
+        Command s{cmdGroup, cmdString, cmdResponse};
+
+        // Serialize the structure to MessagePack
+        std::vector<uint8_t> packed;
+        msgpackpp::sbuffer sbuf;
+        msgpackpp::packer(sbuf, s);
+        packed.assign(sbuf.data(), sbuf.data() + sbuf.size());
+    
+        // Calculate CRC32 hash
+        uint32_t crc32_hash = crc32(0L, (const Bytef *)data.c_str(), data.length()); ;
+
+       // Append CRC32 hash to the serialized data
+        packed.insert(packed.end(), reinterpret_cast<const uint8_t*>(&crc32_hash), reinterpret_cast<const uint8_t*>(&crc32_hash) + sizeof(uint32_t));
+
+
+///
+        std::string cookiesString = createCookiesString(); 
+        std::string queryParams = "aa:", packed; // "UID:", "UIDString";
         std::string encodedParams = base64_encode(queryParams);
 
         removeFromQueue(queue, it->first); // Passing the key to removeFromQueue
@@ -167,14 +214,6 @@ std::string http_get(const std::string& url) {
     }
 
     std::vector<char> response_data = receive_data(ConnectSocket);
-// Print response
-/*
-    for (const auto& data : response_data) {
-        char character = static_cast<char>(data); // Convert ASCII value to char
-        std::cerr << character;
-    }
-    std::cerr << std::endl;
-*/
 
     std::string cmdValue = extractCMD(response_data);
     req_body.clear();
@@ -185,24 +224,39 @@ std::string http_get(const std::string& url) {
 }
 
 std::string extractCMD(const std::vector<char>& data) {
-    const char cmdHeader[] = "cmdGroup:";
-    auto header_start = std::search(data.begin(), data.end(), std::begin(cmdHeader), std::end(cmdHeader) - 1);
-    auto header_end = std::find(header_start, data.end(), '\n');
-    const char cmda[] = "cmdString:";
-    auto argstart = std::search(data.begin(), data.end(), std::begin(cmda), std::end(cmda) - 1);
-    auto argend = std::find(argstart, data.end(), '\n');
-    
-    cmdGroup.assign(header_start + sizeof(cmdHeader) - 1, header_end);
-    cmdString.assign(argstart + sizeof(cmda) - 1, argend);
-    
+///
+    std::vector<uint8_t> received_serialized_data_with_crc = data;
+
+    // Validate CRC32 hash
+    uint32_t received_crc32;
+    std::memcpy(&received_crc32, received_serialized_data_with_crc.data() + received_serialized_data_with_crc.size() - sizeof(uint32_t), sizeof(uint32_t));
+    uint32_t calculated_crc32 = crc32(0L, (const Bytef *)data.c_str(), data.length()); ;
+
+    if (calculated_crc32 == received_crc32) {
+        // CRC32 hash validation successful, deserialize the data
+        Command deserialized_s;
+        msgpackpp::object_handle oh = msgpackpp::unpack(received_serialized_data_with_crc.data(), received_serialized_data_with_crc.size());
+        oh.get().convert(deserialized_s);
+        
+        cmdGroup = deserialized_s.Group;
+        cmdString = deserialized_s.String;
+        
+        std::cout << "Deserialized Command:" << std::endl;
+        std::cout << "cmdGroup: " << cmdGroup << std::endl;
+        std::cout << "cmdString: " << cmdString << std::endl;
+    } else {
+        std::cout << "CRC32 hash validation failed" << std::endl;
+    }
+///
+
     return cmdValue;
 }
 
 void addToQueue(CommandQueue& queue, int key, const std::string& cmdValue, const std::string& cmdString, const std::string& cmdResponse) {
     Command command;
-    command.cmdGroup = cmdValue;
-    command.cmdString = cmdString;
-    command.cmdResponse = cmdResponse;
+    command.Group = cmdValue;
+    command.String = cmdString;
+    command.Response = cmdResponse;
     queue[key] = command;  // Add command to the queue with the specified key
 }
 
@@ -297,5 +351,7 @@ std::vector<char> receive_data(SOCKET ConnectSocket) {
 
     return buffer;
 }
+
+
 
 }

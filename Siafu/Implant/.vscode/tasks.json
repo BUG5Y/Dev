@@ -11,7 +11,9 @@
                 "-o",
                 "${fileDirname}\\${fileBasenameNoExtension}.exe",
                 "-lstdc++",
-                "-lws2_32"
+                "-lws2_32",
+                "-liphlpapi",
+                "-lz"
             ],
             "options": {
                 "cwd": "${fileDirname}"

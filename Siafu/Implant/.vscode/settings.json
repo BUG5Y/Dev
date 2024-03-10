@@ -88,6 +88,11 @@
         "xutility": "cpp",
         "coroutine": "cpp",
         "resumable": "cpp",
-        "xhash": "cpp"
+        "xhash": "cpp",
+        "ranges": "cpp",
+        "regex": "cpp",
+        "stack": "cpp",
+        "bitset": "cpp",
+        "queue": "cpp"
     }
 }

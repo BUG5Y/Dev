@@ -50,9 +50,9 @@ bool execute_cmd(xhttp::CommandQueue& queue, std::string& current_dir, DWORD tim
         // Access the command info
         auto& cmdqueue = it->second; 
         // Access cmdValue, cmdString, cmdResponse
-        std::string cmdGroup = cmdqueue.cmdGroup;
-        std::string cmdString = cmdqueue.cmdString;
-        std::string cmdResponse = cmdqueue.cmdResponse;
+        std::string cmdGroup = cmdqueue.Group;
+        std::string cmdString = cmdqueue.String;
+        std::string cmdResponse = cmdqueue.Response;
 
 		cmdResponse.clear();
 
@@ -109,7 +109,7 @@ bool execute_cmd(xhttp::CommandQueue& queue, std::string& current_dir, DWORD tim
         }
 
 		// Update CommandInfo structure with cmdResponse
-        cmdqueue.cmdResponse = cmdResponse;
+        cmdqueue.Response = cmdResponse;
 		cmdGroup.clear();
 		cmdString.clear();
         CloseHandle(read_hd);
