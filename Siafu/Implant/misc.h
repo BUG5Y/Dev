@@ -1,10 +1,8 @@
 #include <string>
 
 namespace misc {
-    std::string uid;
-
-void init(void) {};
-
-void uninit(void) {};
-std::string buildUID();
+extern std::string uid;
+//extern void init(void) {};
+//extern void uninit(void) {};
+extern std::string buildUID();
 }

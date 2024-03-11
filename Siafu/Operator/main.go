@@ -5,15 +5,24 @@ import (
     "bufio"
     "fmt"
     "net/http"
-    "net/url"
     "os"
     "strings"
-	"encoding/json"
+    "bytes"
+    "encoding/base64"
+    "encoding/json"
+    "io/ioutil"
+
 )
 
 const (
     serverURL = "http://192.168.0.54:8443/operator" // Replace this with your server URL
 )
+
+type Command struct {
+    Group    string `json:"Group"`
+    String  string `json:"String"`
+    Response string `json:"Response"`
+}
 
 func main() {
     for {
@@ -48,58 +57,80 @@ func main() {
 }
 
 func sendCommand(cmdGroup, cmdString string) error {
-    // Create HTTP client
     client := &http.Client{}
 
-    // Create command URL
     commandURL := serverURL
 
-    // Prepare form data
-    formData := url.Values{}
-    formData.Set("cmdGroup", cmdGroup)
-    formData.Set("cmdString", cmdString)
-
-    // Create HTTP request
-    req, err := http.NewRequest("POST", commandURL, strings.NewReader(formData.Encode()))
-    if err != nil {
-        return err
+    cmdData := Command{
+        Group:   cmdGroup,
+        String:  cmdString,
+        Response: "", 
     }
 
-    // Set headers
-    req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+    // Serialize command data to JSON
+    jsonData, err := json.Marshal(cmdData)
+    if err != nil {
+        return fmt.Errorf("error marshaling JSON data: %w", err)
+    }
+
+    // Base64 encode the JSON data
+    base64Data := base64.StdEncoding.EncodeToString(jsonData)
+
+    // Create HTTP request
+    req, err := http.NewRequest("POST", commandURL, bytes.NewBuffer([]byte(base64Data)))
+    if err != nil {
+        return fmt.Errorf("error creating HTTP request: %w", err)
+    }
+    req.Header.Set("Content-Type", "text/plain") // Set content type to text/plain
 
     // Send request
     resp, err := client.Do(req)
     if err != nil {
         return err
     }
-    
 
-    // Check the response status code
+    defer resp.Body.Close()
+
     if resp.StatusCode != http.StatusOK {
         return fmt.Errorf("unexpected status code: %d", resp.StatusCode)
     }
 
-    // Read and parse the response JSON
-    var response struct {
-        CmdGroup   string `json:"cmdGroup"`
-        CmdString  string `json:"cmdString"`
-        CmdResponse string `json:"cmdResponse"`
-    }
+    return nil
 
-    err = json.NewDecoder(resp.Body).Decode(&response)
+    // Read the response
+    responseBody, err := ioutil.ReadAll(resp.Body)
     if err != nil {
-        return err
+        return fmt.Errorf("error reading response body: %w", err)
     }
 
-    // Replace for readability
-    response.CmdResponse = strings.Replace(response.CmdResponse, "\\n", "\n", -1)
-    response.CmdResponse = strings.Replace(response.CmdResponse, "\\r", "\r", -1)
+    // Base64 decode the data
+    decodedData, err := base64.StdEncoding.DecodeString(string(responseBody))
+    if err != nil {
+        return fmt.Errorf("error decoding base64 data: %w", err)
+    }
 
-    fmt.Println("CmdResponse:", response.CmdResponse)
+    // Unmarshal JSON
+    var receivedStruct Command
+    if err := json.Unmarshal(decodedData, &receivedStruct); err != nil {
+        return fmt.Errorf("error unmarshaling JSON data: %w", err)
+    }
 
-	defer resp.Body.Close()
-	
+    // Print or process the command response
+    fmt.Println("CmdResponse:", receivedStruct.Response)
 
     return nil
+}
+
+// Helper functions to convert uint32 to bytes and vice versa
+func uint32ToBytes(n uint32) []byte {
+    b := make([]byte, 4)
+    b[0] = byte(n >> 24)
+    b[1] = byte(n >> 16)
+    b[2] = byte(n >> 8)
+    b[3] = byte(n)
+    return b
+}
+
+func bytesToUint32(b []byte) uint32 {
+    return uint32(b[0])<<24 | uint32(b[1])<<16 | uint32(b[2])<<8 | uint32(b[3])
 }

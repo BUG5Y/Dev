@@ -93,6 +93,16 @@
         "regex": "cpp",
         "stack": "cpp",
         "bitset": "cpp",
-        "queue": "cpp"
+        "queue": "cpp",
+        "csignal": "cpp",
+        "any": "cpp",
+        "strstream": "cpp",
+        "cfenv": "cpp",
+        "codecvt": "cpp",
+        "source_location": "cpp",
+        "shared_mutex": "cpp",
+        "typeindex": "cpp",
+        "valarray": "cpp",
+        "*.ipp": "cpp"
     }
 }

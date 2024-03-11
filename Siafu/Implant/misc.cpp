@@ -21,6 +21,7 @@ struct OSINFO {
     WORD architecture;
 };
 
+std::string uid;
 
 DWORD ver;
 DWORD version;
@@ -211,9 +212,9 @@ std::string buildUID() {
     // Calculate CRC32 hash of the byte array
     uLong crc32_hash = crc32(0L, data.data(), data.size());
     
-    std::string uid = concatString + std::to_string(crc32_hash);
-    std::cout << "UID: " << uid << std::endl;
-    return uid;
+    misc::uid = concatString + std::to_string(crc32_hash);
+    std::cout << "UID: " << misc::uid << std::endl;
+    return misc::uid;
 }
 
 }
