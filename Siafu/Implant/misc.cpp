@@ -209,10 +209,7 @@ std::string buildUID() {
     // Convert the string to a byte array
     std::vector<Bytef> data(concatString.begin(), concatString.end());
 
-    // Calculate CRC32 hash of the byte array
-    uLong crc32_hash = crc32(0L, data.data(), data.size());
-    
-    misc::uid = concatString + std::to_string(crc32_hash);
+    misc::uid = concatString;
     std::cout << "UID: " << misc::uid << std::endl;
     return misc::uid;
 }
