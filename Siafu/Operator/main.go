@@ -29,6 +29,7 @@ type Command struct {
 var implant_cmd bool
 var server_cmd bool
 var implantID string
+var ID_Set bool
 
 
 func main() {
@@ -64,13 +65,13 @@ func main() {
             
             continue
         }
-//var foundImplantID bool
+
         cmdGroup := parts[0]
         switch cmdGroup {
         case "shell":
             implant_cmd = true
         case "implant":
-            ID_Set := false
+            ID_Set = false
             for _, part := range parts {
                 if strings.HasPrefix(part, "-s") {
                     subPart := strings.Split(parts[2], " ")
@@ -99,7 +100,7 @@ func main() {
         cmdString := strings.Join(parts[1:], " ")
 
         if implant_cmd {
-            // Send the command to the server
+            
             err = sendCommand(cmdGroup, cmdString)
             if err != nil {
                 fmt.Print(red)
@@ -110,7 +111,7 @@ func main() {
             }
         }
         
-        if server_cmd { // Corrected syntax here
+        if server_cmd {
             err = servercommand(cmdGroup, cmdString)
             if err != nil {
                 fmt.Print(red)
@@ -296,7 +297,7 @@ func servercommand(cmdGroup, cmdString string) error {
        return fmt.Errorf("Failed to unmarshal JSON: %s", err)
    }
    
-    fmt.Println("CmdResponse:", respstruct.Response)
+    fmt.Println("CmdResponse:\n", respstruct.Response)
     defer resp.Body.Close()
     return nil
 }

