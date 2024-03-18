@@ -5,7 +5,10 @@ go 1.21.6
 require (
 	fyne.io/fyne/v2 v2.4.4
 	github.com/BurntSushi/xgb v0.0.0-20160522181843-27f122750802
+	github.com/fstanis/screenresolution v0.0.0-20190527020317-869904d15333
 	github.com/fyne-io/terminal v0.0.0-20240219224758-1c2f446c1f99
+	github.com/gotk3/gotk3 v0.6.3
+	github.com/zserge/lorca v0.1.10
 )
 
 require (
@@ -26,6 +29,7 @@ require (
 	github.com/godbus/dbus/v5 v5.1.0 // indirect
 	github.com/gopherjs/gopherjs v1.17.2 // indirect
 	github.com/jsummers/gobmp v0.0.0-20151104160322-e2ba15ffa76e // indirect
+	github.com/lxn/win v0.0.0-20210218163916-a377121e959e // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/srwiley/oksvg v0.0.0-20221011165216-be6e8873101c // indirect
 	github.com/srwiley/rasterx v0.0.0-20220730225603-2ab79fcdd4ef // indirect
