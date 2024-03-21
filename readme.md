@@ -1,12 +1,12 @@
 to do
 
 finish the ui
-   - [] add way to close tabs
-   - [] rename tabs
-   - [] add function for building implant
-      needs ability to change server and http(s)
-   - [] fix the styling
-   - [] make the table work - possibly add way to click for a tab
+   - [ ] add way to close tabs
+   - [ ] rename tabs
+   - [ ] add function for building implant
+      - needs ability to change server and http(s)
+   - [ ] fix the styling
+   - [ ] make the table work - possibly add way to click for a tab
 
 update server
   - [] add way for the server to handle implant last contact time
