@@ -9,11 +9,11 @@ finish the ui
    - [ ] make the table work - possibly add way to click for a tab
 
 update server
-  - [] add way for the server to handle implant last contact time
+  - [ ] add way for the server to handle implant last contact time
       most likely use a map
 
 update implant
-  - [] add powershell usage
+  - [ ] add powershell usage
   
 Do quick testing and take screenshots
 Post to new github page
