@@ -14,6 +14,7 @@ import (
 	"math/rand"
     "strconv"
     "strings"
+    "time"
     _ "github.com/mattn/go-sqlite3"
 )
 
@@ -35,10 +36,13 @@ type CommandQueueItem struct {
     Commands [][]string
     IDMask   int
 }
+
 type ConnectionLog struct {
+    Time string
     HostVersion string
     ID          int
 }
+
 var commandQueue []CommandQueueItem
 
 type Command struct {
@@ -338,10 +342,9 @@ func updateConnections() []string {
         // If changes were made, format the log
         var formattedLog string
         for _, conn := range vecconnectionlog {
-            formattedLog += fmt.Sprintf("Host Version: %s, ID: %d\n", conn.HostVersion, conn.ID)
+            formattedLog += fmt.Sprintf("Time: %s, Host Version: %s, ID: %d\n", conn.Time, conn.HostVersion, conn.ID)
         }
         // Append the formatted log to serverresp
-
         serverresp = append(serverresp, formattedLog)
         prevLength = len(vecconnectionlog)
         return serverresp
@@ -576,7 +579,11 @@ func addToDB(uid, versionName string) (int, error) {
     fmt.Println("Host Version:", versionName)
     fmt.Println("ID:", IDMask)
 
+    currentTime := time.Now()
+    timeString := currentTime.Format("2006-01-02 15:04:05")
+
     vecconnectionlog = append(vecconnectionlog, ConnectionLog{
+        Time: timeString,
         HostVersion: versionName,
         ID:          IDMask,
     })
