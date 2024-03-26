@@ -65,20 +65,13 @@ func main() {
         gtk.MainQuit()
     })
 
-    cssProvider, err := gtk.CssProviderNew()
-    if err != nil {
-        fmt.Println("Error creating CSS provider:", err)
-    }
+    // Load CSS stylesheet
+    mRefProvider, _  := gtk.CssProviderNew()
+    mRefProvider.LoadFromPath("./gui.css")
 
-    err = cssProvider.LoadFromData(`
-        .highlighted-row {
-            background-color: #cccccc; /* Light gray */
-        }
-    `)
-    if err != nil {
-        fmt.Println("Error loading CSS data:", err)
-    }
-
+    // Apply to whole app
+    screen, _ := gdk.ScreenGetDefault()
+    gtk.AddProviderForScreen(screen, mRefProvider, 1) 
 
     ScreenWidth := 0
     ScreenHeight := 0
@@ -182,9 +175,17 @@ func main() {
 
     serverMenu := createServerMenu()
     menubar.Append(serverMenu)
-    Text := "<span>Connected to server: <span foreground=\"" + orange + "\">" + serverURL + "</span></span>"
+    // Verify server is up -- serverURL = "http://" + defaultIP + ":" + port
     logBuffer, _ = servertxt.GetBuffer()
-    insertLogMarkup(Text)
+
+    if verifyServerUp(serverURL) {
+        Text := "<span>Connected to server: <span foreground=\"" + orange + "\">" + serverURL + "</span></span>"
+            insertLogMarkup(Text)
+
+    } else {
+        Text := "<span foreground=\"" + red + "\">Unable to connect to server: <span foreground=\"" + orange + "\">" + serverURL + "</span></span>"
+        insertLogMarkup(Text)
+    }
 
     go func() {
         for {
@@ -854,6 +855,14 @@ func handleCmd(cmd string, buffer *gtk.TextBuffer, entry *gtk.Entry, cmdPlaceHol
 }
 
 
+func verifyServerUp(serverURL string) bool {
+    resp, err := http.Get(serverURL)
+    if err != nil {
+        return false
+    }
+    defer resp.Body.Close()
+    return true
+}
 
 func startListener(ip string, port string, proto string) {
     fmt.Print(proto, " listener at ", ip + ":" + port)
@@ -869,7 +878,7 @@ func startListener(ip string, port string, proto string) {
 
     if strings.Contains(output, "listener started") {
         output := proto + " listener started at " + serverIP + ":" + port
-        insertLogMarkup(output)
+        insertLogText(output)
     } else {
         output := "Unable to start listener"
         insertLogMarkup(output)

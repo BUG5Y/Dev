@@ -1,4 +1,61 @@
-#root {
-    background-color: #FFFFFF; /* Change the background color to white */
-    color: #FFFFFF
+/* Set font style for the whole application */
+* {
+    font-family: Arial, sans-serif; /* Font family */
+}
+
+/* Styles for label */
+label {
+    color: #333; /* Text color */
+    font-size: 4px; /* Font size */
+}
+
+/* Styles for entry */
+entry {
+    border: 1px solid #ccc; /* Border */
+    background-color: #f5f5f5; /* Background color */
+    color: #333; /* Text color */
+}
+
+/* Styles for button */
+button {
+    background-color: #007bff; /* Background color */
+    color: #fff; /* Text color */
+    padding: 10px 20px; /* Padding */
+    border: none; /* Border */
+}
+
+/* Styles for dialog */
+dialog {
+    background-color: #fff; /* Background color */
+    border: 1px solid #ccc; /* Border */
+    color: #333; /* Text color */
+}
+
+/* Styles for treeview */
+treeview {
+    background-color: #f9f9f9; /* Cell background color */
+    color: #333; /* Text color */
+}
+
+/* Styles for notebook */
+notebook {
+    background-color: #f5f5f5; /* Tab background */
+    color: #333; /* Text color */
+    padding: 10px; /* Padding */
+}
+
+/* Styles for window */
+window {
+    background-color: #fff; /* Background color */
+    border: 1px solid #ccc; /* Border */
+}
+
+/* Styles for paned */
+paned {
+    background-color: #f5f5f5; /* Background color */
+}
+
+/* Styles for paned handle */
+paned separator {
+    background-color: #ccc; /* Divider handle color */
 }

